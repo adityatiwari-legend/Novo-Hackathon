@@ -1,0 +1,12 @@
+[
+  {
+    "event_id": "EVT-MON-902",
+    "source": "Continuous Compliance Monitor",
+    "metric": "Document Expiration Tracking",
+    "target_doc": "SOP_Document_Management.docx",
+    "target_system": "SYS-LIMS-001",
+    "status": "Warning",
+    "description": "SOP periodic review window has elapsed past grace period.",
+    "simulated_impact_drop": 6
+  }
+]

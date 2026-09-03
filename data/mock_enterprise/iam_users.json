@@ -1,0 +1,34 @@
+[
+  {
+    "username": "qa_lead",
+    "email": "qa@demo.local",
+    "roles": ["QA_COMPLIANCE", "AUDITOR"],
+    "system_entitlements": ["SYS-LIMS-001:QA_APPROVER", "GLOBAL-QMS:REVIEWER"],
+    "mfa_enabled": true,
+    "last_access_review": "2026-06-30"
+  },
+  {
+    "username": "sys_owner",
+    "email": "owner@demo.local",
+    "roles": ["SYSTEM_OWNER"],
+    "system_entitlements": ["SYS-LIMS-001:BUSINESS_ADMIN"],
+    "mfa_enabled": true,
+    "last_access_review": "2026-06-30"
+  },
+  {
+    "username": "auditor_external",
+    "email": "auditor@demo.local",
+    "roles": ["AUDITOR", "VIEWER"],
+    "system_entitlements": ["SYS-LIMS-001:READ_ONLY_AUDIT"],
+    "mfa_enabled": true,
+    "last_access_review": "2026-06-30"
+  },
+  {
+    "username": "admin_user",
+    "email": "admin@demo.local",
+    "roles": ["ADMIN"],
+    "system_entitlements": ["ALL:ADMINISTRATOR"],
+    "mfa_enabled": true,
+    "last_access_review": "2026-06-30"
+  }
+]

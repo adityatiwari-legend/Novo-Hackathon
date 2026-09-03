@@ -1,0 +1,33 @@
+[
+  {
+    "document_number": "VLT-DOC-8821",
+    "title": "System A User Requirements Specification",
+    "system_id": "SYS-LIMS-001",
+    "lifecycle_state": "Draft / Pending QA Approval",
+    "version": "1.0",
+    "owner": "Sarah Jenkins (System Owner)",
+    "qa_reviewer": "Not Assigned",
+    "effective_date": null,
+    "periodic_review_due": "2027-01-15"
+  },
+  {
+    "document_number": "VLT-SOP-0112",
+    "title": "SOP for GxP Computerized Systems Document Management",
+    "system_id": "GLOBAL-QMS",
+    "lifecycle_state": "Effective",
+    "version": "3.2",
+    "owner": "Global Quality Assurance",
+    "effective_date": "2024-09-01",
+    "periodic_review_due": "2026-09-01"
+  },
+  {
+    "document_number": "VLT-SOP-0044",
+    "title": "SOP for GxP IT Change Control and Release Validation",
+    "system_id": "GLOBAL-QMS",
+    "lifecycle_state": "Effective",
+    "version": "2.4",
+    "owner": "IT Quality & Compliance",
+    "effective_date": "2025-03-10",
+    "periodic_review_due": "2027-03-10"
+  }
+]

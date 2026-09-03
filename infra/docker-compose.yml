@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: gxp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gxp_user
+      POSTGRES_PASSWORD: gxp_secure_password_2026
+      POSTGRES_DB: gxp_compliance_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gxp_user -d gxp_compliance_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../
+      dockerfile: backend/Dockerfile
+    container_name: gxp_backend
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://gxp_user:gxp_secure_password_2026@db:5432/gxp_compliance_db
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-nvidia/nemotron-3.5-lightning:free}
+      - AI_MODEL=${AI_MODEL:-nvidia/nemotron-3.5-lightning:free}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-nvidia/nemotron-3.5-lightning:free}
+      - DEMO_MODE=true
+      - MOCK_SERVICENOW=true
+      - MOCK_VAULT=true
+      - MOCK_IAM=true
+      - MOCK_MONITORING=true
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../data:/app/data
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: gxp_frontend
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

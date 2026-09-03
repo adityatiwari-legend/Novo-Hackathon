@@ -1,0 +1,22 @@
+[
+  {
+    "sys_id": "INC0089201",
+    "system_id": "SYS-LIMS-001",
+    "short_description": "LIMS Audit trail synchronization latency exceeded 30s threshold",
+    "severity": "2 - High",
+    "state": "In Progress",
+    "assigned_to": "IT_OPS_Lead",
+    "opened_at": "2026-08-14T09:20:00Z",
+    "impact": "Data Integrity Monitoring Alert"
+  },
+  {
+    "sys_id": "INC0089144",
+    "system_id": "SYS-LIMS-001",
+    "short_description": "Automated backup checksum verification succeeded with warning",
+    "severity": "3 - Moderate",
+    "state": "Closed",
+    "assigned_to": "Backup_Admin",
+    "opened_at": "2026-07-29T02:00:00Z",
+    "impact": "Disaster Recovery"
+  }
+]

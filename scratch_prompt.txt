@@ -1,0 +1,2234 @@
+<USER_REQUEST>
+You are continuing development of an existing hackathon project.
+
+IMPORTANT:
+The previous implementation phase is COMPLETE.
+
+DO NOT rebuild the application from scratch.
+DO NOT replace the existing architecture.
+DO NOT delete working functionality.
+DO NOT create a second application.
+DO NOT blindly rewrite existing files.
+
+Your task is to inspect the CURRENT repository, understand what has already been implemented, identify what is missing, and now implement the REAL document-driven GxP compliance intelligence layer using the supplied Novo Life MES PAS-X dummy lifecycle documents.
+
+============================================================
+PROJECT
+============================================================
+
+Project:
+
+Agentic AI Co-Pilot for Always-On, Audit-Ready GxP IT System Management
+
+The project is a hackathon prototype inspired by the Novo Nordisk problem context.
+
+The application already contains the base implementation from the previous phase.
+
+Now we need to turn it from:
+
+"working prototype"
+
+into:
+
+"credible end-to-end GxP document intelligence and compliance assessment platform."
+
+============================================================
+CRITICAL SOURCE OF TRUTH
+============================================================
+
+The uploaded documents are the source of truth for the demo dataset and domain model.
+
+Use the actual content and terminology from the supplied documents.
+
+Important supplied documents include:
+
+- Master Lifecycle Generation Plan
+  NL-MES-MLGP-001
+
+- User Requirement Specification
+  NL-MES-URS-001
+
+- Functional Specification
+  NL-MES-FS-001
+
+- IT Risk Assessment
+  NL-MES-ITRA-001
+
+- IT Requirement Risk Assessment
+  NL-MES-ITRRA-001
+
+- Supplier Assessment
+  NL-MES-SUPA-001
+
+- Operation and Maintenance SOP
+  NL-MES-OMSOP-001
+
+- Service Level Agreement
+  NL-MES-SLA-001
+
+- IT Periodic System Evaluation
+  NL-MES-ITPSE-001
+
+- IT Implementation Report
+  NL-MES-IREP-001
+
+- and the other supplied lifecycle / integration / recovery / verification documents.
+
+These documents describe a fictional "Novo Life" MES PAS-X implementation.
+
+IMPORTANT:
+
+These are explicitly DUMMY / HACKATHON / TRAINING documents.
+
+They must NEVER be presented by the application as genuine Novo Nordisk operational, regulatory, validated, approved, or production records.
+
+The UI must clearly display:
+
+"DUMMY / HACKATHON / TRAINING SIMULATION"
+
+where appropriate.
+
+============================================================
+FIRST TASK — INSPECT EXISTING PROJECT
+============================================================
+
+Before modifying anything:
+
+1. Inspect the repository.
+2. Inspect backend structure.
+3. Inspect frontend structure.
+4. Inspect database models.
+5. Inspect API routes.
+6. Inspect existing agent implementation.
+7. Inspect existing RAG implementation.
+8. Inspect existing authentication/RBAC.
+9. Inspect current seed/demo data.
+10. Inspect current environment configuration.
+11. Run the existing application.
+12. Run existing tests.
+13. Identify broken flows.
+14. Create a concise implementation-gap report.
+
+Do NOT ask me to repeat information already available in the repository.
+
+Do NOT rebuild existing modules that already work.
+
+After inspection, immediately continue implementation.
+
+============================================================
+PRIMARY OBJECTIVE
+============================================================
+
+Implement a REAL document intelligence pipeline:
+
+DOCUMENT
+↓
+INGESTION
+↓
+PARSING
+↓
+METADATA EXTRACTION
+↓
+SECTION DETECTION
+↓
+REQUIREMENT EXTRACTION
+↓
+RISK EXTRACTION
+↓
+TRACEABILITY EXTRACTION
+↓
+CHUNKING
+↓
+EMBEDDING
+↓
+VECTOR INDEX
+↓
+RAG
+↓
+COMPLIANCE ENGINE
+↓
+RISK ENGINE
+↓
+READINESS ENGINE
+↓
+RECOMMENDATIONS
+↓
+EVIDENCE PACK
+↓
+HUMAN APPROVAL
+↓
+AUDIT TRAIL
+
+The important part is that these components must operate on the actual uploaded documents.
+
+============================================================
+1. OPENROUTER AI PROVIDER
+============================================================
+
+I DO NOT HAVE AN OPENAI API KEY.
+
+I WILL PROVIDE AN OPENROUTER API KEY.
+
+Implement the AI layer so that OpenRouter is the default provider.
+
+OpenRouter is OpenAI-compatible.
+
+Use:
+
+OPENROUTER_API_KEY
+
+and:
+
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+
+Do NOT hardcode the key.
+
+Use environment variables.
+
+Example:
+
+OPENROUTER_API_KEY=
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+
+OPENROUTER_MODEL=
+
+The model must be configurable.
+
+Do not hardcode a specific model into business logic.
+
+Create an abstraction:
+
+LLMProvider
+
+with:
+
+generate()
+generate_structured()
+stream()
+health_check()
+
+Then implement:
+
+OpenRouterProvider
+
+The rest of the application should depend on the provider abstraction rather than directly depending on OpenAI.
+
+This makes it possible to switch providers later.
+
+============================================================
+2. OPENROUTER COMPATIBILITY
+============================================================
+
+Use the OpenAI-compatible interface.
+
+Python example architecture:
+
+OpenAI(
+    api_key=settings.OPENROUTER_API_KEY,
+    base_url=settings.OPENROUTER_BASE_URL
+)
+
+Do NOT create OpenAI-specific assumptions elsewhere.
+
+All model calls must pass through the provider service.
+
+============================================================
+3. MODEL CONFIGURATION
+============================================================
+
+Create:
+
+AI_MODEL=
+AI_TEMPERATURE=
+AI_MAX_TOKENS=
+
+Recommended defaults should be conservative for compliance analysis.
+
+Use low temperature for:
+
+- compliance
+- extraction
+- classification
+- risk reasoning
+- structured outputs
+
+Do not use creative generation settings for compliance judgments.
+
+============================================================
+4. EMBEDDING ARCHITECTURE
+============================================================
+
+Do not assume the LLM and embedding model are the same thing.
+
+Create:
+
+EmbeddingProvider
+
+with:
+
+embed_text()
+embed_documents()
+
+Make embeddings configurable.
+
+Preferred architecture:
+
+Option A:
+Use OpenRouter-compatible embeddings if configured.
+
+Option B:
+Use a local sentence-transformers embedding model.
+
+The application must continue working if an OpenRouter embedding model is unavailable.
+
+Use local embeddings as the reliable fallback.
+
+Do NOT make the entire application dependent on an unavailable embedding endpoint.
+
+============================================================
+5. DOCUMENT INGESTION
+============================================================
+
+Implement robust ingestion for:
+
+PDF
+DOCX
+XLSX
+TXT
+
+For every document extract:
+
+document_id
+title
+document_type
+version
+date
+status
+classification
+system
+project
+owner
+review roles
+approval state
+source references
+upstream records
+downstream records
+
+Also extract:
+
+sections
+tables
+requirements
+risks
+controls
+verification references
+traceability references
+assumptions
+Verify items
+open actions
+approval information
+change history
+
+Preserve:
+
+page number
+section number
+heading
+table context
+document ID
+
+These become citation metadata.
+
+============================================================
+6. DOCUMENT TYPE CLASSIFICATION
+============================================================
+
+Automatically classify documents into:
+
+URS
+FS
+DS
+CS
+ITRA
+ITRRA
+SUPA
+SOP
+SLA
+ITPSE
+IREP
+TEST_PROTOCOL
+TEST_REPORT
+RECOVERY
+INTEGRATION
+TRACEABILITY
+RISK
+OTHER
+
+Do not rely only on filenames.
+
+Use:
+
+filename
+document ID
+title
+headings
+content
+
+Combine deterministic matching with LLM classification when necessary.
+
+============================================================
+7. REQUIREMENT EXTRACTION
+============================================================
+
+Extract requirements from documents.
+
+A requirement object:
+
+{
+    "requirement_id": "...",
+    "document_id": "...",
+    "text": "...",
+    "type": "functional|non_functional",
+    "source_page": 12,
+    "source_section": "5.2",
+    "risk_reference": "...",
+    "verification_reference": "...",
+    "status": "..."
+}
+
+The supplied ITRRA document explicitly contains a baseline of:
+
+50 URS requirements
+
+with:
+
+25 Functional
+25 Non-functional
+
+Do not invent additional requirements merely to make the system look complete.
+
+Extract the actual requirement IDs and content from the documents.
+
+============================================================
+8. RISK EXTRACTION
+============================================================
+
+Extract the actual risk register.
+
+The supplied system risk baseline uses:
+
+RSK-MES-001 through RSK-MES-026
+
+and the requirement risk baseline reuses that risk namespace.
+
+The supplied ITRRA indicates:
+
+49 Working High
+1 Working Medium
+0 Working Low
+
+and:
+
+Residual risk is not rated.
+
+Do not convert these into "accepted risks."
+
+Preserve:
+
+Working
+Open
+Pending
+Not Rated
+Accepted
+
+as distinct states.
+
+============================================================
+9. TRACEABILITY ENGINE
+============================================================
+
+This is a major feature.
+
+Build a traceability graph.
+
+At minimum support:
+
+Business Need
+↓
+URS Requirement
+↓
+Risk
+↓
+Functional Specification
+↓
+Design
+↓
+Test / Verification
+↓
+Result
+↓
+Exception / Deviation
+↓
+Release
+↓
+Operational Control
+↓
+Periodic Review
+
+Use actual references found in the supplied documents.
+
+Example:
+
+URS-028
+→ RSK-MES-007
+→ FS requirement
+→ verification record
+→ implementation record
+
+The UI must allow a user to click through this chain.
+
+============================================================
+10. TRACEABILITY GAP DETECTION
+============================================================
+
+Automatically detect:
+
+- requirement with no risk mapping
+- requirement with no functional specification mapping
+- requirement with no verification mapping
+- risk with no control
+- control with no evidence
+- test with no requirement
+- evidence with no source
+- open deviation
+- release gate blocked by missing prerequisite
+- operational control marked not activated
+
+Create findings such as:
+
+"Requirement URS-XXX has no verification evidence."
+
+Severity:
+
+HIGH / MEDIUM / LOW
+
+Every finding must cite the supporting document.
+
+============================================================
+11. COMPLIANCE RULE ENGINE
+============================================================
+
+IMPORTANT:
+
+Do NOT put compliance logic entirely inside the LLM prompt.
+
+Create a deterministic rule engine.
+
+Create:
+
+data/seed/compliance_rules.json
+
+Rules should be based on the supplied lifecycle package.
+
+Examples:
+
+DOCUMENT-CONTROL
+
+- document ID present
+- version present
+- date present
+- status present
+- classification present
+
+APPROVAL
+
+- expected review roles present
+- approval state present
+- simulated approval clearly distinguished from real approval
+
+REQUIREMENTS
+
+- requirement exists
+- requirement is testable
+- requirement has traceability
+
+RISK
+
+- requirement risk mapping exists
+- system risk register exists
+- residual risk status is explicit
+
+VERIFICATION
+
+- verification reference exists
+- result exists
+- open verification gaps detected
+
+RELEASE
+
+- required release gates satisfied
+- open blockers detected
+- release recommendation detected
+
+OPERATIONS
+
+- O&M SOP exists
+- monitoring controls exist
+- backup/recovery controls exist
+- access controls exist
+- incident/change controls exist
+- periodic evaluation exists
+
+SUPPLIER
+
+- supplier assessment exists
+- supplier evidence state is known
+- open supplier conditions detected
+
+============================================================
+12. RULE ENGINE MUST BE CONFIGURABLE
+============================================================
+
+The judges may ask:
+
+"What if the checklist changes?"
+
+Therefore:
+
+DO NOT hardcode rules into Python.
+
+Load them from configuration.
+
+Allow:
+
+add rule
+disable rule
+change severity
+change category
+change weighting
+
+without changing agent code.
+
+============================================================
+13. READINESS SCORE
+============================================================
+
+Implement a deterministic readiness engine.
+
+The LLM does NOT decide the readiness score.
+
+The scoring engine calculates it.
+
+Input:
+
+compliance results
+traceability results
+risk findings
+verification state
+release gates
+open actions
+document completeness
+
+Output:
+
+readiness_score
+
+plus:
+
+blocking_findings
+high_findings
+medium_findings
+low_findings
+
+The score must be explainable.
+
+Example:
+
+Readiness:
+
+82%
+
+Reasons:
+
+- 1 high-severity gap
+- 2 medium gaps
+- 94% document coverage
+- 88% traceability coverage
+- release gate G5 not met
+
+The exact weights must be configurable.
+
+============================================================
+14. RELEASE GATE LOGIC
+============================================================
+
+The supplied documents explicitly contain lifecycle gates.
+
+Examples include:
+
+G4
+G5
+G6
+
+and the ITPSE states:
+
+Current release recommendation:
+HOLD / DEFER - DO NOT RELEASE
+
+The implementation report also records:
+
+G5 release readiness not met
+G6 handover not met
+
+Use these actual concepts.
+
+Create:
+
+Release Gate Engine
+
+with states:
+
+MET
+NOT_MET
+PENDING
+BLOCKED
+NOT_APPLICABLE
+
+A release decision must never be inferred solely from the LLM.
+
+If a critical gate is NOT_MET:
+
+release_status = HOLD
+
+============================================================
+15. DEMO SYSTEM STATE
+============================================================
+
+The primary demo system should be:
+
+Novo Life MES PAS-X
+
+System state:
+
+PRE-OPERATIONAL / NOT ACTIVATED
+
+Do NOT present it as production.
+
+The supplied ITPSE explicitly concludes that the solution is:
+
+not in control
+not validated
+not fit for operational use
+not released
+
+and the release recommendation is:
+
+HOLD / DEFER - DO NOT RELEASE
+
+This should become the central demo finding.
+
+============================================================
+16. "IS THIS SYSTEM AUDIT READY?"
+============================================================
+
+This must become a real workflow.
+
+When user asks:
+
+"Is the MES PAS-X system audit ready?"
+
+Supervisor should:
+
+1. Identify system.
+2. Retrieve lifecycle documents.
+3. Retrieve requirements.
+4. Retrieve risks.
+5. Retrieve verification evidence.
+6. Evaluate checklist.
+7. Evaluate traceability.
+8. evaluate release gates.
+9. calculate readiness.
+10. identify blockers.
+11. generate recommendations.
+12. return citations.
+
+Response structure:
+
+Audit Readiness
+
+Status:
+NOT READY
+
+Readiness:
+XX%
+
+Release Recommendation:
+HOLD / DEFER
+
+Critical blockers:
+...
+
+High-risk gaps:
+...
+
+Evidence:
+...
+
+Confidence:
+...
+
+============================================================
+17. RAG MUST BE SOURCE-GROUNDED
+============================================================
+
+The assistant must never answer from generic GxP knowledge when the user is asking about the supplied system.
+
+Example:
+
+Question:
+
+"What is the current release recommendation?"
+
+The answer MUST come from the supplied documents.
+
+Expected evidence:
+
+NL-MES-ITPSE-001
+
+The system should cite:
+
+document
+page
+section
+
+If evidence conflicts:
+
+do not silently choose.
+
+Say:
+
+"Conflicting evidence detected."
+
+Then show both sources.
+
+============================================================
+18. CITATION FORMAT
+============================================================
+
+Every important factual answer must include:
+
+Document
+Document ID
+Version
+Page
+Section
+
+Example:
+
+Source:
+NL-MES-ITPSE-001
+Version 0.1
+Page 1
+Section: Overall conclusion
+
+For UI:
+
+[NL-MES-ITPSE-001 | p.1 | Overall conclusion]
+
+Clicking citation opens document viewer.
+
+============================================================
+19. EVIDENCE VIEWER
+============================================================
+
+Build a document evidence viewer.
+
+When the user clicks:
+
+"Why is release blocked?"
+
+show:
+
+Finding
+
+↓
+Source document
+
+↓
+Page
+
+↓
+Section
+
+↓
+Relevant text
+
+↓
+Related requirement
+
+↓
+Related risk
+
+↓
+Related verification
+
+This is one of the most important judge-facing features.
+
+============================================================
+20. CONFIDENCE
+============================================================
+
+Do not allow the model to arbitrarily claim:
+
+"Confidence = 99%."
+
+Create confidence scoring.
+
+Consider:
+
+retrieval similarity
+source count
+source authority
+source agreement
+claim coverage
+structured rule support
+
+For deterministic findings:
+
+confidence can be very high when directly supported.
+
+For LLM-generated interpretations:
+
+confidence should depend on evidence.
+
+Show:
+
+HIGH
+MEDIUM
+LOW
+
+and numerical score.
+
+============================================================
+21. DOCUMENT CONSISTENCY ANALYSIS
+============================================================
+
+Add a document consistency agent/service.
+
+Compare related documents.
+
+Detect:
+
+- conflicting status
+- conflicting version
+- conflicting dates
+- inconsistent system state
+- inconsistent approval state
+- requirement referenced but missing
+- document referenced but unavailable
+- release status conflicts
+- open action referenced downstream
+- "approved" wording versus actual simulation boundary
+
+Example:
+
+SLA says:
+
+PRE-OPERATIONAL / NOT ACTIVATED
+
+ITPSE says:
+
+HOLD / DEFER - DO NOT RELEASE
+
+The system should understand that these are consistent rather than contradictory.
+
+But if two documents genuinely conflict:
+
+create:
+
+DOCUMENT_CONSISTENCY_FINDING
+
+============================================================
+22. LIFECYCLE STATUS GRAPH
+============================================================
+
+Create a visual lifecycle:
+
+Business Process
+↓
+URS
+↓
+FS
+↓
+Design
+↓
+Risk
+↓
+Verification
+↓
+Implementation
+↓
+Release
+↓
+Operations
+↓
+Periodic Review
+
+Each stage should show:
+
+Complete
+Conditional
+Open
+Not Performed
+Not Met
+Planned
+
+Use actual document evidence.
+
+The supplied implementation report has examples such as:
+
+- integration requirements complete
+- IQ complete
+- backup/restore complete
+- OV/PfV/UAT not performed
+- production deployment not performed
+- training open
+- handover open
+- residual risk acceptance open
+- VSR deferred
+- G5 not met
+- G6 not met
+
+Use those states in the visualization.
+
+============================================================
+23. "WHAT IS BLOCKING RELEASE?"
+============================================================
+
+Add a one-click action:
+
+"What is blocking release?"
+
+The system should identify:
+
+1. G5 not met
+2. G6 not met
+3. residual risks not accepted
+4. operational training open
+5. handover incomplete
+6. VSR deferred
+7. other evidence gaps discovered by rules
+
+Do not fabricate blockers.
+
+Every blocker must have evidence.
+
+============================================================
+24. RECOMMENDATION ENGINE
+============================================================
+
+Recommendations must be derived from findings.
+
+Example:
+
+Finding:
+
+"OV/PfV/UAT not performed."
+
+Recommendation:
+
+"Complete intended-use verification and produce an approved verification report before release readiness can be reassessed."
+
+Another:
+
+"Residual risks not accepted."
+
+Recommendation:
+
+"Route open residual-risk items through the authorized fictional acceptance process."
+
+Another:
+
+"G6 handover not met."
+
+Recommendation:
+
+"Complete ownership, support, knowledge-transfer and operational handover prerequisites."
+
+The AI must NOT claim to perform these actions.
+
+============================================================
+25. HUMAN APPROVAL
+============================================================
+
+Any recommendation that could affect:
+
+release
+risk acceptance
+GxP status
+document status
+workflow execution
+CAPA
+change
+access
+production
+
+must require human approval.
+
+Flow:
+
+AI recommendation
+↓
+Pending approval
+↓
+Human reviewer
+↓
+Approve / Reject
+↓
+Audit event
+
+AI can recommend.
+
+AI cannot authorize.
+
+============================================================
+26. DEMO WORKFLOW
+============================================================
+
+Implement this exact polished demo:
+
+STEP 1
+
+Dashboard.
+
+Show:
+
+Novo Life MES PAS-X
+
+Status:
+
+PRE-OPERATIONAL
+
+Release:
+
+HOLD / DEFER
+
+Readiness:
+
+calculated dynamically
+
+Open findings:
+
+calculated dynamically
+
+============================================================
+
+STEP 2
+
+User opens Chat.
+
+Question:
+
+"Is the MES PAS-X system audit ready?"
+
+============================================================
+
+STEP 3
+
+Supervisor executes.
+
+Show live agent progress:
+
+✓ System Knowledge
+✓ Document Retrieval
+✓ Compliance
+✓ Traceability
+✓ Risk
+✓ Release Gate
+✓ Recommendation
+
+Do NOT expose chain-of-thought.
+
+Only show high-level execution status.
+
+============================================================
+
+STEP 4
+
+Answer:
+
+NOT AUDIT READY
+
+Show:
+
+Readiness score
+
+Release recommendation
+
+Critical blockers
+
+Top findings
+
+Evidence
+
+============================================================
+
+STEP 5
+
+User asks:
+
+"What is blocking release?"
+
+System returns evidence-backed blockers.
+
+============================================================
+
+STEP 6
+
+User asks:
+
+"Why is G5 not met?"
+
+System retrieves the implementation report and relevant lifecycle evidence.
+
+Show:
+
+source
+page
+section
+related actions
+
+============================================================
+
+STEP 7
+
+User asks:
+
+"Have all verification activities been completed?"
+
+System should identify that intended-use verification such as OV/PfV/UAT is not performed/open according to the supplied implementation report.
+
+Do NOT hallucinate completion.
+
+============================================================
+
+STEP 8
+
+User asks:
+
+"What risks remain open?"
+
+Retrieve:
+
+ITRA
+ITRRA
+
+Show:
+
+open risk count
+severity
+residual-risk state
+acceptance state
+
+============================================================
+
+STEP 9
+
+User clicks:
+
+"Generate Audit Evidence Pack"
+
+Generate:
+
+PDF
+DOCX
+
+Containing:
+
+Executive Summary
+System Status
+Readiness Score
+Release Recommendation
+Lifecycle Status
+Compliance Checklist
+Traceability Summary
+Open Risks
+Open Findings
+Verification Status
+Release Gates
+Recommendations
+Source Evidence
+Audit Trail
+
+============================================================
+
+STEP 10
+
+User clicks:
+
+"Create Remediation Plan"
+
+System creates recommendations.
+
+These become:
+
+PENDING HUMAN APPROVAL
+
+============================================================
+
+STEP 11
+
+Human approves one recommendation.
+
+Create a mock workflow.
+
+Do not actually claim a real enterprise action occurred.
+
+============================================================
+
+STEP 12
+
+Audit trail records:
+
+document analyzed
+finding created
+risk assessed
+recommendation generated
+workflow created
+human approval recorded
+
+============================================================
+27. ALWAYS-ON SIMULATION
+============================================================
+
+The existing project should already have a continuous-monitoring concept.
+
+Now make it meaningful.
+
+Create a simulation engine.
+
+Events:
+
+DOCUMENT_REVIEW_OVERDUE
+NEW_OPEN_RISK
+VERIFICATION_FAILED
+RELEASE_GATE_CHANGED
+SUPPLIER_CONDITION_OPENED
+RECOVERY_TEST_FAILED
+TRAINING_NOT_COMPLETED
+HANDOVER_NOT_COMPLETED
+
+When an event occurs:
+
+1. detect event
+2. identify affected system
+3. rerun applicable compliance rules
+4. recalculate readiness
+5. create finding
+6. create recommendation
+7. create audit event
+
+The dashboard must update.
+
+============================================================
+28. REAL DOCUMENT-BASED DASHBOARD
+============================================================
+
+Dashboard metrics must come from database analysis.
+
+Do not hardcode:
+
+82%
+3 findings
+etc.
+
+Calculate dynamically.
+
+Dashboard:
+
+System
+Status
+Readiness
+Release Recommendation
+High Risks
+Open Findings
+Traceability
+Verification
+Last Assessment
+
+============================================================
+29. COMPLIANCE PAGE
+============================================================
+
+Show rule categories:
+
+Document Control
+Requirements
+Risk
+Traceability
+Verification
+Release
+Operations
+Security
+Supplier
+Continuity
+
+For each:
+
+Passed
+Failed
+Warning
+Not Evaluated
+
+Each failed rule must have:
+
+reason
+source
+recommendation
+
+============================================================
+30. RISK PAGE
+============================================================
+
+Display actual extracted risks.
+
+Filters:
+
+Critical
+High
+Medium
+Low
+Open
+Pending
+Residual Not Rated
+
+Show:
+
+Risk ID
+Description
+Impact
+Control
+Status
+Evidence
+
+Do not alter source risk ratings.
+
+============================================================
+31. TRACEABILITY PAGE
+============================================================
+
+Create a graph/table:
+
+Requirement
+Risk
+Specification
+Design
+Test
+Result
+Exception
+Release
+
+Clicking any node should open evidence.
+
+============================================================
+32. RELEASE READINESS PAGE
+============================================================
+
+Create a dedicated release readiness workspace.
+
+Show:
+
+Overall decision:
+
+HOLD / DEFER
+
+Gate status:
+
+G1
+G2
+G3
+G4
+G5
+G6
+
+where supported by supplied lifecycle documents.
+
+For each:
+
+status
+evidence
+blocking reason
+
+============================================================
+33. EVIDENCE PACK
+============================================================
+
+Evidence pack must be generated from database records.
+
+Never simply ask the LLM to "write a report."
+
+Pipeline:
+
+Collect structured findings
+↓
+collect citations
+↓
+validate source references
+↓
+generate sections
+↓
+validate claims
+↓
+create DOCX/PDF
+
+Every conclusion should have evidence references.
+
+============================================================
+34. EVIDENCE VALIDATOR
+============================================================
+
+Before finalizing an evidence pack:
+
+check:
+
+Every finding has source.
+Every risk has source.
+Every recommendation has source.
+Every release blocker has source.
+Every score has deterministic calculation.
+Every document reference exists.
+
+If validation fails:
+
+DO NOT generate final evidence pack.
+
+Show:
+
+Evidence validation failed.
+
+============================================================
+35. AUDIT TRAIL
+============================================================
+
+Every AI action must be logged.
+
+Examples:
+
+DOCUMENT_UPLOADED
+DOCUMENT_PARSED
+DOCUMENT_CLASSIFIED
+REQUIREMENTS_EXTRACTED
+RISKS_EXTRACTED
+RAG_QUERY
+COMPLIANCE_ASSESSMENT
+TRACEABILITY_ANALYSIS
+READINESS_CALCULATED
+RECOMMENDATION_GENERATED
+EVIDENCE_PACK_GENERATED
+WORKFLOW_CREATED
+HUMAN_APPROVAL
+HUMAN_REJECTION
+CONTINUOUS_CHECK
+FINDING_CREATED
+
+Include:
+
+timestamp
+actor
+agent
+action
+entity
+input reference
+output reference
+confidence
+previous_hash
+event_hash
+
+============================================================
+36. DO NOT EXPOSE CHAIN OF THOUGHT
+============================================================
+
+The UI must NEVER show internal model reasoning.
+
+Instead show:
+
+Agent:
+Compliance Agent
+
+Task:
+Checking requirement coverage
+
+Status:
+Completed
+
+Result:
+7 findings
+
+Confidence:
+92%
+
+This provides transparency without exposing private reasoning.
+
+============================================================
+37. SECURITY
+============================================================
+
+Protect:
+
+API keys
+uploaded documents
+user permissions
+audit logs
+
+Use:
+
+RBAC
+authentication
+authorization
+input validation
+file validation
+rate limiting where practical
+secure file paths
+environment variables
+
+Never log:
+
+OPENROUTER_API_KEY
+
+Never return:
+
+OPENROUTER_API_KEY
+
+to frontend.
+
+============================================================
+38. DEMO DATA
+============================================================
+
+Use the actual supplied dummy documents.
+
+DO NOT create fake replacement documents if the actual files are available.
+
+Create an ingestion script:
+
+scripts/ingest_demo_documents.py
+
+It should:
+
+1. locate supplied demo documents
+2. parse them
+3. classify them
+4. extract metadata
+5. extract requirements
+6. extract risks
+7. build chunks
+8. build embeddings
+9. populate database
+10. build traceability graph
+
+Make the process repeatable.
+
+============================================================
+39. RESET DEMO
+============================================================
+
+Create:
+
+scripts/reset_demo.py
+
+This should:
+
+- clear demo data
+- clear vector index
+- reseed users
+- ingest documents
+- rebuild analysis
+- restore a clean demo environment
+
+This is critical for hackathon demonstrations.
+
+============================================================
+40. PERFORMANCE
+============================================================
+
+Do not call the LLM unnecessarily.
+
+Use deterministic logic wherever possible.
+
+Cache:
+
+document metadata
+embeddings
+retrieval results when safe
+compliance results
+
+Do not send entire 50-page documents to the LLM.
+
+Retrieve only relevant chunks.
+
+============================================================
+41. TOKEN MANAGEMENT
+============================================================
+
+The supplied documents are large.
+
+Implement:
+
+chunking
+metadata filtering
+top-k retrieval
+context limits
+
+For document analysis:
+
+process sections independently.
+
+For compliance:
+
+prefer structured extraction over sending the full document.
+
+============================================================
+42. FRONTEND UX
+============================================================
+
+The existing frontend should be upgraded, not replaced.
+
+Make it feel like an enterprise compliance platform.
+
+Important visual elements:
+
+Readiness score
+Release status
+Gate status
+Risk severity
+Evidence status
+Traceability
+AI confidence
+Document citations
+Human approval state
+
+Avoid:
+
+generic ChatGPT clone
+giant gradients
+unnecessary animations
+fake AI visualizations
+
+============================================================
+43. AI ACTIVITY PANEL
+============================================================
+
+Create a compact panel:
+
+AI Assessment
+
+Supervisor
+→ Retrieved 14 evidence chunks
+→ Compliance checked 42 rules
+→ Traceability checked 50 requirements
+→ Risk checked 26 risks
+→ Release gates evaluated
+→ 8 findings generated
+
+This demonstrates agentic orchestration.
+
+============================================================
+44. AGENT IMPLEMENTATION
+============================================================
+
+Existing agents should be reused where possible.
+
+Core agents:
+
+Supervisor
+System Knowledge
+Compliance
+Risk
+Audit Evidence
+Recommendation
+
+Add specialized services where needed:
+
+Document Intelligence
+Traceability
+Release Gate
+Consistency
+
+Do NOT create 11 fake agents just for presentation.
+
+Functional depth matters more than agent count.
+
+============================================================
+45. AGENT OUTPUT SCHEMA
+============================================================
+
+Every agent should return structured JSON.
+
+Example:
+
+{
+  "agent": "compliance_agent",
+  "status": "completed",
+  "confidence": 0.94,
+  "findings": [],
+  "rules_evaluated": 42,
+  "citations": [],
+  "recommendations": [],
+  "warnings": []
+}
+
+Use Pydantic validation.
+
+============================================================
+46. ERROR HANDLING
+============================================================
+
+If OpenRouter is unavailable:
+
+show:
+
+AI provider unavailable.
+
+Do not crash.
+
+If RAG fails:
+
+show:
+
+Knowledge retrieval unavailable.
+
+If document parsing fails:
+
+show:
+
+Document processing failed.
+
+If evidence is missing:
+
+show:
+
+Insufficient evidence.
+
+Never hallucinate.
+
+============================================================
+47. PROVIDER HEALTH CHECK
+============================================================
+
+Add:
+
+GET /api/v1/ai/health
+
+Return:
+
+provider
+model
+status
+latency
+last_success
+
+Never expose the API key.
+
+Admin UI should display:
+
+AI Provider:
+OpenRouter
+
+Model:
+configured model
+
+Status:
+Healthy / Degraded / Offline
+
+============================================================
+48. ENVIRONMENT FILE
+============================================================
+
+Update:
+
+.env.example
+
+with:
+
+OPENROUTER_API_KEY=
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_MODEL=
+
+DATABASE_URL=
+
+VECTOR_STORE_PATH=
+
+UPLOAD_DIR=
+
+SECRET_KEY=
+
+DEMO_MODE=true
+
+MOCK_SERVICENOW=true
+MOCK_VAULT=true
+MOCK_IAM=true
+MOCK_MONITORING=true
+
+============================================================
+49. README UPDATE
+============================================================
+
+Update README with:
+
+1. OpenRouter setup
+2. Environment variables
+3. Demo ingestion
+4. Database initialization
+5. Running frontend
+6. Running backend
+7. Resetting demo
+8. Demo user accounts
+9. Architecture
+10. RAG architecture
+11. Agent architecture
+12. Compliance engine
+13. Readiness scoring
+14. Evidence generation
+15. Human approval
+16. Known limitations
+
+Include:
+
+"OpenAI API key is not required."
+
+============================================================
+50. TESTING
+============================================================
+
+Add tests for:
+
+Document classification
+Metadata extraction
+Requirement extraction
+Risk extraction
+Traceability
+Compliance rules
+Readiness calculation
+Release gates
+RAG citations
+Confidence scoring
+Evidence validation
+Approval workflow
+Audit trail
+Hash-chain verification
+
+Critical integration test:
+
+INGEST DOCUMENTS
+→ EXTRACT REQUIREMENTS
+→ EXTRACT RISKS
+→ BUILD TRACEABILITY
+→ RUN COMPLIANCE
+→ CALCULATE READINESS
+→ IDENTIFY RELEASE BLOCKERS
+→ GENERATE RECOMMENDATIONS
+→ GENERATE EVIDENCE PACK
+→ CREATE APPROVAL
+→ APPROVE
+→ WRITE AUDIT LOG
+
+============================================================
+51. ACCEPTANCE TEST
+============================================================
+
+The following must work after implementation.
+
+Start the application.
+
+Login.
+
+Open:
+
+Novo Life MES PAS-X.
+
+Dashboard must show dynamically calculated state.
+
+Ask:
+
+"Is the MES PAS-X system audit ready?"
+
+The system must retrieve actual documents.
+
+It must calculate readiness.
+
+It must show:
+
+NOT READY
+
+and:
+
+HOLD / DEFER - DO NOT RELEASE
+
+if that remains supported by the current evidence.
+
+Then ask:
+
+"What is blocking release?"
+
+The system must cite the implementation report / periodic evaluation evidence.
+
+Then ask:
+
+"Have all intended-use verification activities been completed?"
+
+The system must identify the open/not-performed state found in the implementation report.
+
+Then ask:
+
+"What risks remain open?"
+
+The system must retrieve the actual risk baseline.
+
+Then:
+
+"Generate an audit evidence pack."
+
+The system must produce a real PDF/DOCX.
+
+Then:
+
+"Create remediation plan."
+
+The system must create recommendations.
+
+Then:
+
+"Create approval workflow."
+
+Workflow must become:
+
+PENDING APPROVAL.
+
+Human approves.
+
+Audit trail records it.
+
+============================================================
+52. IMPORTANT DOMAIN BOUNDARY
+============================================================
+
+The supplied documents repeatedly state that these are fictional dummy records.
+
+The application must preserve that boundary.
+
+Never display:
+
+"Novo Nordisk approved"
+
+"FDA compliant"
+
+"21 CFR Part 11 certified"
+
+"Validated production system"
+
+unless actual source evidence explicitly supports such wording.
+
+Prefer:
+
+"Training simulation"
+
+"Dummy lifecycle package"
+
+"Prototype"
+
+"Evidence-backed assessment"
+
+"Not a production release decision"
+
+============================================================
+53. IMPORTANT REGULATORY BOUNDARY
+============================================================
+
+The application is a hackathon prototype.
+
+It may demonstrate alignment with:
+
+GxP principles
+ALCOA+
+data integrity
+traceability
+human-in-the-loop
+auditability
+
+But do NOT claim regulatory certification.
+
+Production deployment would require:
+
+formal validation
+qualification
+security assessment
+model governance
+data governance
+organizational approval
+appropriate computerized-system assurance controls
+
+============================================================
+54. DO NOT FAKE THE DATA
+============================================================
+
+This is extremely important.
+
+If the supplied document says:
+
+"Open"
+
+display:
+
+OPEN.
+
+If it says:
+
+"Not performed"
+
+display:
+
+NOT PERFORMED.
+
+If it says:
+
+"Not met"
+
+display:
+
+NOT MET.
+
+If it says:
+
+"Residual risk not rated"
+
+display:
+
+NOT RATED.
+
+If evidence is unavailable:
+
+display:
+
+NOT FOUND.
+
+Never convert:
+
+simulated approval
+
+into:
+
+real approval.
+
+Never convert:
+
+planned
+
+into:
+
+completed.
+
+Never convert:
+
+document reviewed
+
+into:
+
+system validated.
+
+============================================================
+55. FINAL QUALITY BAR
+============================================================
+
+The implementation is complete only when:
+
+- existing functionality still works
+- actual documents are searchable
+- citations work
+- compliance is deterministic
+- readiness is deterministic
+- risk data is traceable
+- release gates are evidence-backed
+- recommendations are generated from findings
+- evidence packs contain real citations
+- human approval works
+- audit trail works
+- OpenRouter works
+- no OpenAI key is required
+- no secrets are hardcoded
+- no major frontend console errors exist
+- no broken buttons exist
+- no fake AI responses exist
+- no hardcoded readiness numbers exist
+
+============================================================
+56. DEVELOPMENT METHOD
+============================================================
+
+Work incrementally.
+
+After each major change:
+
+1. Run tests.
+2. Start backend.
+3. Start frontend.
+4. Verify APIs.
+5. Verify UI.
+6. Fix errors.
+7. Continue.
+
+Do not stop after creating a plan.
+
+Implement the changes.
+
+============================================================
+57. FINAL RESPONSE AFTER IMPLEMENTATION
+============================================================
+
+When finished, report:
+
+1. Existing architecture discovered
+2. Problems found
+3. Changes implemented
+4. Files changed
+5. New database tables/columns
+6. New APIs
+7. New agents/services
+8. OpenRouter configuration
+9. RAG architecture
+10. Compliance rules
+11. Readiness scoring formula
+12. Release gate logic
+13. Evidence generation
+14. Human approval flow
+15. Audit trail
+16. Tests executed
+17. Test results
+18. How to configure OPENROUTER_API_KEY
+19. Exact commands to run
+20. Exact demo walkthrough
+21. Known limitations
+
+DO NOT claim completion unless the end-to-end demo has actually been tested.
+
+FINAL PRINCIPLE:
+
+Do not build more pages.
+
+Make the existing application genuinely understand the supplied MES PAS-X lifecycle package.
+
+The judge should be able to ask a question about the system, receive an evidence-backed answer, click the evidence, understand the compliance gap, see the risk and traceability relationship, see why release is blocked, generate an evidence pack, create a remediation recommendation, approve it as a human, and see the entire activity recorded in the audit trail.
+
+That is the goal.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-03T23:05:43+05:30.
+
+The user's current state is as follows:
+Active Document: d:\Novo Hackathon\frontend\lib\types.ts (LANGUAGE_TYPESCRIPT)
+Cursor is on line: 1
+Other open documents:
+- d:\Novo Hackathon\frontend\lib\types.ts (LANGUAGE_TYPESCRIPT)
+Browser State:
+  Page 2286BB1165A51A87ED4B8189A43585F7 (GxP AI Co-Pilot | Novo Nordisk) - http://localhost:3000/dashboard [ACTIVE]
+    Viewport: 1536x826, Page Height: 1037
+</ADDITIONAL_METADATA>

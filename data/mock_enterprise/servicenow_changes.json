@@ -1,0 +1,13 @@
+[
+  {
+    "chg_id": "CHG004210",
+    "system_id": "SYS-LIMS-001",
+    "short_description": "Upgrade LIMS Database Schema to patch CVE-2026-1192 and align audit table indexes",
+    "type": "Standard GxP Change",
+    "state": "Implemented",
+    "risk_level": "Moderate",
+    "qa_approved": true,
+    "change_owner": "owner@demo.local",
+    "closed_at": "2026-08-01T14:30:00Z"
+  }
+]

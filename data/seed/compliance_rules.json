@@ -1,0 +1,159 @@
+{
+  "rules_metadata": {
+    "version": "2.0.0",
+    "lifecycle_scope": "Novo Life MES PAS-X (SYS-MES-001) Computerized System Validation",
+    "regulatory_frameworks": ["21 CFR Part 11", "EU Annex 11", "GAMP 5 Category 4", "ALCOA+", "ICH Q9"]
+  },
+  "rules": [
+    {
+      "id": "DOC-001",
+      "category": "Document Control",
+      "requirement": "Master Lifecycle Generation Plan (MLGP) must be approved and versioned.",
+      "severity": "HIGH",
+      "penalty": 8,
+      "document_type": "MLGP",
+      "check_type": "DOCUMENT_EXISTS",
+      "mandatory": true
+    },
+    {
+      "id": "DOC-002",
+      "category": "Document Control",
+      "requirement": "All documents must have a unique identifier, version, status, and classification.",
+      "severity": "MEDIUM",
+      "penalty": 4,
+      "document_type": "ALL",
+      "check_type": "METADATA_INTEGRITY",
+      "mandatory": true
+    },
+    {
+      "id": "APP-001",
+      "category": "Approval",
+      "requirement": "Quality Assurance (QA Compliance Unit) sign-off must be authorized prior to operational use.",
+      "severity": "CRITICAL",
+      "penalty": 15,
+      "document_type": "URS",
+      "check_type": "QA_APPROVAL_AUTHORIZED",
+      "mandatory": true
+    },
+    {
+      "id": "REQ-001",
+      "category": "Requirements",
+      "requirement": "All 50 baseline URS requirements must be uniquely identified and testable.",
+      "severity": "HIGH",
+      "penalty": 10,
+      "document_type": "URS",
+      "check_type": "REQUIREMENTS_COUNT_50",
+      "mandatory": true
+    },
+    {
+      "id": "TRC-001",
+      "category": "Traceability",
+      "requirement": "Every URS requirement must have bidirectional mapping to a functional specification module.",
+      "severity": "MEDIUM",
+      "penalty": 5,
+      "document_type": "FS",
+      "check_type": "REQUIREMENT_FS_MAPPING",
+      "mandatory": true
+    },
+    {
+      "id": "TRC-002",
+      "category": "Traceability",
+      "requirement": "Every URS requirement must map to a corresponding risk item in the ITRRA.",
+      "severity": "HIGH",
+      "penalty": 8,
+      "document_type": "ITRRA",
+      "check_type": "REQUIREMENT_RISK_MAPPING",
+      "mandatory": true
+    },
+    {
+      "id": "RSK-001",
+      "category": "Risk",
+      "requirement": "System Risk Assessment must identify system hazards across patient safety and data integrity.",
+      "severity": "HIGH",
+      "penalty": 8,
+      "document_type": "ITRA",
+      "check_type": "SYSTEM_RISKS_26",
+      "mandatory": true
+    },
+    {
+      "id": "RSK-002",
+      "category": "Risk",
+      "requirement": "Residual risks must be evaluated and formally accepted by authorized Quality Unit.",
+      "severity": "CRITICAL",
+      "penalty": 14,
+      "document_type": "ITRRA",
+      "check_type": "RESIDUAL_RISK_ACCEPTED",
+      "mandatory": true
+    },
+    {
+      "id": "VER-001",
+      "category": "Verification",
+      "requirement": "Technical Installation Qualification (IQ) and Interface Verification must be complete.",
+      "severity": "MEDIUM",
+      "penalty": 5,
+      "document_type": "IREP",
+      "check_type": "TECHNICAL_IQ_COMPLETE",
+      "mandatory": true
+    },
+    {
+      "id": "VER-002",
+      "category": "Verification",
+      "requirement": "Intended-use operational verification (OV / PfV / UAT) must be executed before release.",
+      "severity": "CRITICAL",
+      "penalty": 15,
+      "document_type": "IREP",
+      "check_type": "INTENDED_USE_VERIFICATION_PERFORMED",
+      "mandatory": true
+    },
+    {
+      "id": "REL-001",
+      "category": "Release",
+      "requirement": "Lifecycle Phase Gate G5 (Release Readiness) must be MET.",
+      "severity": "CRITICAL",
+      "penalty": 15,
+      "document_type": "IREP",
+      "check_type": "GATE_G5_MET",
+      "mandatory": true
+    },
+    {
+      "id": "REL-002",
+      "category": "Release",
+      "requirement": "Lifecycle Phase Gate G6 (Operational Handover) must be MET.",
+      "severity": "HIGH",
+      "penalty": 10,
+      "document_type": "IREP",
+      "check_type": "GATE_G6_MET",
+      "mandatory": true
+    },
+    {
+      "id": "OPS-001",
+      "category": "Operations",
+      "requirement": "Operation & Maintenance SOP (OMSOP) must govern backup and admin procedures.",
+      "severity": "MEDIUM",
+      "penalty": 4,
+      "document_type": "SOP",
+      "check_type": "OMSOP_ACTIVE",
+      "mandatory": true
+    },
+    {
+      "id": "OPS-002",
+      "category": "Operations",
+      "requirement": "Service Level Agreement (SLA) operational tiers must be formally activated upon handover.",
+      "severity": "MEDIUM",
+      "penalty": 4,
+      "document_type": "SLA",
+      "check_type": "SLA_ACTIVATED",
+      "mandatory": true
+    },
+    {
+      "id": "SUP-001",
+      "category": "Supplier",
+      "requirement": "Supplier assessment must qualify software vendor without unresolved critical observations.",
+      "severity": "MEDIUM",
+      "penalty": 4,
+      "document_type": "SUPA",
+      "check_type": "SUPPLIER_QUALIFIED",
+      "mandatory": true
+    }
+  ]
+}

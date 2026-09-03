@@ -1,0 +1,66 @@
+[
+  {
+    "code": "DOC-001",
+    "requirement": "Approved URS exists",
+    "document_types": ["URS"],
+    "severity": "HIGH",
+    "weight": 15,
+    "description": "System must have a formally approved User Requirements Specification (URS) defining all GxP business and technical requirements."
+  },
+  {
+    "code": "DOC-002",
+    "requirement": "Document version is present",
+    "document_types": ["ALL"],
+    "severity": "MEDIUM",
+    "weight": 8,
+    "description": "Document must clearly declare a formal version identifier (e.g., v1.0, v2.1) in compliance with ALCOA+ traceability."
+  },
+  {
+    "code": "DOC-003",
+    "requirement": "Required approval evidence exists",
+    "document_types": ["ALL"],
+    "severity": "HIGH",
+    "weight": 20,
+    "description": "Document must include explicit QA, System Owner, and Business Owner approval signatures or electronic approval records."
+  },
+  {
+    "code": "DOC-004",
+    "requirement": "Review date is current",
+    "document_types": ["ALL"],
+    "severity": "MEDIUM",
+    "weight": 10,
+    "description": "Document periodic review date must be within valid cycle (e.g. within the last 24 months, not overdue)."
+  },
+  {
+    "code": "SEC-001",
+    "requirement": "Audit trail and electronic signature controls defined",
+    "document_types": ["URS", "RISK_ASSESSMENT"],
+    "severity": "HIGH",
+    "weight": 15,
+    "description": "System specifications must explicitly define 21 CFR Part 11 / Annex 11 compliant audit trail and electronic signature controls."
+  },
+  {
+    "code": "RISK-001",
+    "requirement": "GxP impact and data integrity risk assessment completed",
+    "document_types": ["RISK_ASSESSMENT"],
+    "severity": "HIGH",
+    "weight": 15,
+    "description": "Formal risk assessment must categorize GxP criticality, data integrity risk (ALCOA+), and patient safety controls."
+  },
+  {
+    "code": "CHG-001",
+    "requirement": "Change control and release management traceability documented",
+    "document_types": ["SOP", "URS"],
+    "severity": "MEDIUM",
+    "weight": 9,
+    "description": "Traceability must link functional requirements to validated change control procedures and test verifications."
+  },
+  {
+    "code": "ACC-001",
+    "requirement": "Role-based access control (RBAC) and segregation of duties defined",
+    "document_types": ["URS", "RISK_ASSESSMENT"],
+    "severity": "MEDIUM",
+    "weight": 8,
+    "description": "System must document user role definitions, segregation of duties, and periodic access review requirements."
+  }
+]
