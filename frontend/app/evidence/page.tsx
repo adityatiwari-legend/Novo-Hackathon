@@ -1,0 +1,165 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import {
+  FileCheck, Download, Sparkles, RefreshCw, CheckCircle2,
+  FileText, Shield, Clock, ExternalLink
+} from 'lucide-react';
+import { api } from '@/lib/api';
+import { EvidencePack } from '@/lib/types';
+
+export default function EvidencePage() {
+  const [evidencePacks, setEvidencePacks] = useState<EvidencePack[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [genStep, setGenStep] = useState<string | null>(null);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const res = await api.getEvidencePacks('SYS-LIMS-001');
+      setEvidencePacks(res);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setGenStep('Collecting evidence chunks from vector index...');
+    
+    setTimeout(() => setGenStep('Validating source citations against 21 CFR Part 11...'), 800);
+    setTimeout(() => setGenStep('Building bidirectional requirements-to-test traceability matrix...'), 1600);
+    setTimeout(() => setGenStep('Compiling ReportLab PDF and Word .docx evidence dossier...'), 2400);
+
+    try {
+      await api.generateEvidencePack('SYS-LIMS-001');
+      setGenStep('Writing tamper-evident audit event with SHA-256 hash chaining...');
+      setTimeout(async () => {
+        await loadData();
+        setGenerating(false);
+        setGenStep(null);
+      }, 800);
+    } catch (err) {
+      console.error(err);
+      setGenerating(false);
+      setGenStep(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header & Generation CTA */}
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <FileCheck className="w-6 h-6 text-blue-600" />
+            <h1 className="text-xl font-bold text-slate-900">GxP IT Audit Evidence Dossier Generator</h1>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Automated compilation of audit-ready evidence packs complete with executive summary, checklist verifications,
+            risk assessment, citations, and cryptographic audit ledger.
+          </p>
+        </div>
+
+        <button
+          onClick={handleGenerate}
+          disabled={generating}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 shrink-0"
+        >
+          <Sparkles className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />
+          {generating ? 'Generating Pack...' : 'Generate New Evidence Pack'}
+        </button>
+      </div>
+
+      {/* Real-time Generation Pipeline Progress Banner */}
+      {generating && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-900 shadow-sm space-y-2 animate-fadeIn">
+          <div className="flex items-center gap-2 font-bold">
+            <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+            <span>Audit Evidence Agent Execution Pipeline</span>
+          </div>
+          <p className="text-slate-700 font-mono text-[11px]">{genStep}</p>
+          <div className="w-full bg-blue-200 h-1.5 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-600 animate-pulse w-3/4"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Generated Evidence Dossiers Table */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Generated Evidence Packs Dossier Archive</h2>
+            <p className="text-xs text-slate-500">Official audit dossiers available for download in PDF and Word formats</p>
+          </div>
+          <button onClick={loadData} className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold">
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Refresh</span>
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs text-slate-700">
+            <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
+              <tr>
+                <th className="py-3 px-4 font-semibold">Dossier Title & Scope</th>
+                <th className="py-3 px-4 font-semibold">Version</th>
+                <th className="py-3 px-4 font-semibold">Status</th>
+                <th className="py-3 px-4 font-semibold">Generated By</th>
+                <th className="py-3 px-4 font-semibold">Timestamp</th>
+                <th className="py-3 px-4 font-semibold text-right">Download Formats</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {evidencePacks.map((pack) => (
+                <tr key={pack.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="py-3 px-4">
+                    <div className="font-bold text-slate-900">{pack.title}</div>
+                    <div className="text-[10px] text-slate-400">{pack.scope}</div>
+                  </td>
+                  <td className="py-3 px-4 font-mono font-semibold">v{pack.version}</td>
+                  <td className="py-3 px-4">
+                    <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">
+                      {pack.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-slate-600 font-mono text-[11px]">{pack.generated_by}</td>
+                  <td className="py-3 px-4 text-slate-500 text-[11px]">
+                    {new Date(pack.created_at).toLocaleString()}
+                  </td>
+                  <td className="py-3 px-4 text-right space-x-2">
+                    <a
+                      href={api.getPdfDownloadUrl(pack.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2.5 py-1 rounded text-xs font-semibold transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>PDF</span>
+                    </a>
+                    <a
+                      href={api.getDocxDownloadUrl(pack.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded text-xs font-semibold transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>DOCX</span>
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
