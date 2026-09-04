@@ -223,5 +223,35 @@
     "source": "Agentic AI Co-Pilot (Human-Authorized Workflow)",
     "created_at": "2026-09-03T19:32:15.401611+00:00",
     "url": "https://novonordisk.service-now.com/nav_to.do?uri=task.do?sys_id=SNOW-TASK-1015"
+  },
+  {
+    "ticket_id": "SNOW-TASK-1016",
+    "sys_id": "snt_1016_1788509730",
+    "number": "SNOW-TASK-1016",
+    "system_id": "SYS-LIMS-001",
+    "short_description": "[GxP Copilot] Route URS for QA signoff",
+    "description": "Approved by QA Compliance",
+    "priority": "2 - High",
+    "state": "Open / Work in Progress",
+    "assigned_to": "Sarah Jenkins (Technical System Owner)",
+    "assignment_group": "QA_Compliance_Systems",
+    "source": "Agentic AI Co-Pilot (Human-Authorized Workflow)",
+    "created_at": "2026-09-04T08:15:30.949441+00:00",
+    "url": "https://novonordisk.service-now.com/nav_to.do?uri=task.do?sys_id=SNOW-TASK-1016"
+  },
+  {
+    "ticket_id": "SNOW-TASK-1017",
+    "sys_id": "snt_1017_1788510340",
+    "number": "SNOW-TASK-1017",
+    "system_id": "SYS-LIMS-001",
+    "short_description": "[GxP Copilot] Route URS for QA signoff",
+    "description": "Approved by QA Compliance",
+    "priority": "2 - High",
+    "state": "Open / Work in Progress",
+    "assigned_to": "Sarah Jenkins (Technical System Owner)",
+    "assignment_group": "QA_Compliance_Systems",
+    "source": "Agentic AI Co-Pilot (Human-Authorized Workflow)",
+    "created_at": "2026-09-04T08:25:40.149001+00:00",
+    "url": "https://novonordisk.service-now.com/nav_to.do?uri=task.do?sys_id=SNOW-TASK-1017"
   }
 ]

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Lock, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, XCircle,
   RefreshCw, FileText, Download, Filter, Search, ChevronRight, Eye,
-  ExternalLink, Layers, GitCompare, CheckSquare, Sparkles
+  ExternalLink, Layers, GitCompare, CheckSquare, Sparkles, ArrowRight
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import {
@@ -60,10 +60,12 @@ export default function AuditPage() {
 
   const loadTrailData = async () => {
     try {
-      const logRes = await api.getAuditLogs(100);
+      const [logRes, verifyRes] = await Promise.all([
+        api.getAuditLogs(100),
+        api.verifyAuditChain().catch(() => null)
+      ]);
       setLogs(logRes);
-      const verifyRes = await api.verifyAuditChain();
-      setVerificationResult(verifyRes);
+      if (verifyRes) setVerificationResult(verifyRes);
     } catch (err) {
       console.error('Failed to load audit logs:', err);
     }
@@ -131,92 +133,85 @@ export default function AuditPage() {
 
   return (
     <div className="space-y-6">
-      {/* Simulation Notice Disclaimer */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-center justify-between text-xs text-amber-900 shadow-sm">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-          <span className="font-semibold">Regulatory Disclaimer:</span>
-          <span>
-            This is a hackathon/training simulation and does not constitute a regulatory audit, validation decision, or production release authorization.
-          </span>
-        </div>
-        <span className="font-mono text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded border border-amber-300 shrink-0">
-          SYS-MES-001 | PAS-X
-        </span>
-      </div>
-
-      {/* Main Header & Tab Navigation */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-[#002B49] text-white flex items-center justify-center">
-              <ShieldCheck className="w-5 h-5" />
+      {/* Top Header & Tab Switcher */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#002B49] text-white flex items-center justify-center shadow-xs">
+            <ShieldCheck className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold text-slate-900">GxP IT Audit & Lifecycle Intelligence</h1>
+              <span className="text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded">
+                SYS-MES-001
+              </span>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900">GxP IT Audit & Lifecycle Intelligence</h1>
-              <p className="text-xs text-slate-500">
-                Continuous deterministic evaluation of Novo Life MES PAS-X against Master IT SOP & Top 25 Audit Questions
-              </p>
-            </div>
+            <p className="text-xs text-slate-500">
+              Deterministic evaluation of Novo Life MES PAS-X against Master IT SOP & Top 25 Audit Questions
+            </p>
           </div>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-lg text-xs font-semibold self-stretch md:self-auto overflow-x-auto">
+        <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl text-xs font-semibold self-stretch md:self-auto overflow-x-auto">
           <button
             onClick={() => setActiveTab('checklist')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shrink-0 ${
               activeTab === 'checklist'
-                ? 'bg-white text-slate-900 shadow-sm'
+                ? 'bg-white text-slate-900 shadow-xs font-bold'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <CheckSquare className="w-4 h-4 text-blue-600" />
-            <span>Top 25 Audit Checklist</span>
+            <span>Top 25 Checklist</span>
           </button>
           <button
             onClick={() => setActiveTab('comparison')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shrink-0 ${
               activeTab === 'comparison'
-                ? 'bg-white text-slate-900 shadow-sm'
+                ? 'bg-white text-slate-900 shadow-xs font-bold'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <GitCompare className="w-4 h-4 text-purple-600" />
-            <span>Master SOP Comparison</span>
+            <span>Master SOP Benchmark</span>
           </button>
           <button
             onClick={() => setActiveTab('trail')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shrink-0 ${
               activeTab === 'trail'
-                ? 'bg-white text-slate-900 shadow-sm'
+                ? 'bg-white text-slate-900 shadow-xs font-bold'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <Lock className="w-4 h-4 text-emerald-600" />
-            <span>Cryptographic Trail</span>
+            <span>SHA-256 Ledger</span>
           </button>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* TAB 1: TOP 25 GxP IT AUDIT CHECKLIST EXECUTION */}
+      {/* TAB 1: TOP 25 GxP IT AUDIT CHECKLIST */}
       {/* ========================================================================= */}
       {activeTab === 'checklist' && (
         <div className="space-y-6">
           {/* Executive KPI Summary Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm col-span-2 sm:col-span-1 lg:col-span-2">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Overall Audit Readiness</span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-3xl font-extrabold text-[#002B49]">
-                  {assessment?.readiness_score ?? 64.6}%
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs col-span-2 sm:col-span-1 lg:col-span-2 flex flex-col justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                  Audit Readiness
                 </span>
-                <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                  HOLD / DEFER
-                </span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-black text-[#002B49] tabular-nums">
+                    {assessment?.readiness_score ?? 64.6}%
+                  </span>
+                  <span className="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 font-mono">
+                    HOLD / DEFER
+                  </span>
+                </div>
               </div>
-              <div className="w-full bg-slate-100 h-2 rounded-full mt-2 overflow-hidden">
+              <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
                 <div
                   className="bg-blue-600 h-full rounded-full transition-all duration-500"
                   style={{ width: `${assessment?.readiness_score ?? 64.6}%` }}
@@ -224,41 +219,41 @@ export default function AuditPage() {
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Questions</span>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{assessment?.total_questions ?? 25}</p>
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">Total Questions</span>
+              <p className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">{assessment?.total_questions ?? 25}</p>
               <span className="text-[10px] text-slate-500">Curated Core Subset</span>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm bg-emerald-50/20">
-              <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Passed</span>
-              <p className="text-2xl font-bold text-emerald-700 mt-1">{assessment?.passed_count ?? 15}</p>
-              <span className="text-[10px] text-emerald-600">60% compliant</span>
+            <div className="bg-white p-4 rounded-xl border border-emerald-100 shadow-xs bg-emerald-50/30">
+              <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider font-mono">Passed</span>
+              <p className="text-2xl font-bold text-emerald-700 mt-1 tabular-nums">{assessment?.passed_count ?? 15}</p>
+              <span className="text-[10px] text-emerald-600 font-semibold">60% compliant</span>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-amber-100 shadow-sm bg-amber-50/20">
-              <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Partial</span>
-              <p className="text-2xl font-bold text-amber-700 mt-1">{assessment?.partial_count ?? 4}</p>
-              <span className="text-[10px] text-amber-600">Mitigation required</span>
+            <div className="bg-white p-4 rounded-xl border border-amber-100 shadow-xs bg-amber-50/30">
+              <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider font-mono">Partial</span>
+              <p className="text-2xl font-bold text-amber-700 mt-1 tabular-nums">{assessment?.partial_count ?? 4}</p>
+              <span className="text-[10px] text-amber-600 font-semibold">Mitigation required</span>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-rose-100 shadow-sm bg-rose-50/20">
-              <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Failed</span>
-              <p className="text-2xl font-bold text-rose-700 mt-1">{assessment?.failed_count ?? 6}</p>
-              <span className="text-[10px] text-rose-600">Release blockers</span>
+            <div className="bg-white p-4 rounded-xl border border-rose-100 shadow-xs bg-rose-50/30">
+              <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider font-mono">Failed</span>
+              <p className="text-2xl font-bold text-rose-700 mt-1 tabular-nums">{assessment?.failed_count ?? 6}</p>
+              <span className="text-[10px] text-rose-600 font-semibold">Release blockers</span>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-purple-100 shadow-sm bg-purple-50/20">
-              <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider">Critical Findings</span>
-              <p className="text-2xl font-bold text-purple-700 mt-1">{assessment?.critical_findings_count ?? 4}</p>
-              <span className="text-[10px] text-purple-600">Gate G5/G6 blocked</span>
+            <div className="bg-white p-4 rounded-xl border border-purple-100 shadow-xs bg-purple-50/30">
+              <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider font-mono">Critical</span>
+              <p className="text-2xl font-bold text-purple-700 mt-1 tabular-nums">{assessment?.critical_findings_count ?? 4}</p>
+              <span className="text-[10px] text-purple-600 font-semibold">Gate G5 blocked</span>
             </div>
           </div>
 
           {/* Action Toolbar & Filters */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 mr-1">Filter:</span>
+              <span className="text-xs font-bold text-slate-500 font-mono mr-1">Filter:</span>
               {[
                 { label: 'All (25)', val: 'ALL' },
                 { label: 'Failed (6)', val: 'FAIL', color: 'text-rose-700 bg-rose-50 border-rose-200' },
@@ -271,7 +266,7 @@ export default function AuditPage() {
                   onClick={() => setFilterResult(f.val)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
                     filterResult === f.val
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
                       : f.color || 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
@@ -295,26 +290,26 @@ export default function AuditPage() {
               <button
                 onClick={handleExecuteAudit}
                 disabled={executing}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors shrink-0 disabled:opacity-50"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors shrink-0 disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${executing ? 'animate-spin' : ''}`} />
-                <span>{executing ? 'Executing...' : 'Run Top 25 Audit'}</span>
+                <span>{executing ? 'Evaluating...' : 'Run Top 25 Audit'}</span>
               </button>
 
               <button
                 onClick={handleGenerateReport}
                 disabled={generatingReport}
-                className="bg-[#002B49] hover:bg-[#001D33] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors shrink-0 disabled:opacity-50"
+                className="bg-[#002B49] hover:bg-[#001D33] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors shrink-0 disabled:opacity-50"
               >
                 <FileText className="w-3.5 h-3.5 text-blue-300" />
-                <span>{generatingReport ? 'Compiling Dossier...' : 'Generate Audit Report'}</span>
+                <span>{generatingReport ? 'Compiling...' : 'Generate Dossier'}</span>
               </button>
             </div>
           </div>
 
           {/* Generated Report Banner */}
           {reportResult && (
-            <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-emerald-900 shadow-sm animate-in fade-in">
+            <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-emerald-900 shadow-xs animate-fadeIn">
               <div className="flex items-center gap-2.5">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                 <div>
@@ -328,7 +323,7 @@ export default function AuditPage() {
                     href={api.getReportDownloadUrl(reportResult.pdf_path)}
                     target="_blank"
                     rel="noreferrer"
-                    className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-md font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                    className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Download PDF</span>
@@ -339,10 +334,10 @@ export default function AuditPage() {
                     href={api.getReportDownloadUrl(reportResult.docx_path)}
                     target="_blank"
                     rel="noreferrer"
-                    className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1.5 rounded-md font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                    className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1.5 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>Download Word (DOCX)</span>
+                    <span>Download DOCX</span>
                   </a>
                 )}
               </div>
@@ -350,19 +345,19 @@ export default function AuditPage() {
           )}
 
           {/* Checklist Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
                     <th className="py-3 px-4 w-12 text-center">#</th>
-                    <th className="py-3 px-4 w-28">Question Code</th>
-                    <th className="py-3 px-4 w-44">Lifecycle Phase</th>
+                    <th className="py-3 px-4 w-28">Code</th>
+                    <th className="py-3 px-4 w-44">Phase</th>
                     <th className="py-3 px-4">Audit Question & Control Topic</th>
                     <th className="py-3 px-4 w-28 text-center">Result</th>
                     <th className="py-3 px-4 w-48">Evidence Citations</th>
                     <th className="py-3 px-4 w-24 text-center">Severity</th>
-                    <th className="py-3 px-4 w-20 text-center">Actions</th>
+                    <th className="py-3 px-4 w-20 text-center">Inspect</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
@@ -375,7 +370,7 @@ export default function AuditPage() {
                       <tr
                         key={item.question_id}
                         className={`hover:bg-slate-50/80 transition-colors ${
-                          isFail ? 'bg-rose-50/10' : ''
+                          isFail ? 'bg-rose-50/15' : ''
                         }`}
                       >
                         <td className="py-3 px-4 font-mono font-bold text-slate-400 text-center">
@@ -429,7 +424,7 @@ export default function AuditPage() {
                         </td>
                         <td className="py-3 px-4 text-center">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
                               item.risk_level === 'CRITICAL'
                                 ? 'bg-purple-100 text-purple-800 border border-purple-300'
                                 : item.risk_level === 'HIGH'
@@ -460,16 +455,16 @@ export default function AuditPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: MASTER SOP LIFECYCLE COMPARISON */}
+      {/* TAB 2: MASTER SOP LIFECYCLE BENCHMARK */}
       {/* ========================================================================= */}
       {activeTab === 'comparison' && (
         <div className="space-y-6">
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
                 <GitCompare className="w-5 h-5 text-purple-600" />
                 <h2 className="text-base font-bold text-slate-900">
-                  Cross-Document Comparison: Master IT SOP vs MES PAS-X
+                  Cross-Document Benchmark: Master IT SOP vs MES PAS-X
                 </h2>
               </div>
               <p className="text-xs text-slate-500 mt-1">
@@ -480,7 +475,7 @@ export default function AuditPage() {
 
             <div className="flex items-center gap-3">
               <span className="text-xs bg-rose-50 text-rose-800 border border-rose-200 font-semibold px-2.5 py-1 rounded-lg">
-                Deviations Identified: {comparison?.deviations_count ?? 3}
+                Deviations: {comparison?.deviations_count ?? 3}
               </span>
               <span className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold px-2.5 py-1 rounded-lg">
                 Aligned Controls: {comparison?.aligned_count ?? 2}
@@ -495,7 +490,7 @@ export default function AuditPage() {
               return (
                 <div
                   key={idx}
-                  className={`bg-white rounded-xl border p-5 shadow-sm space-y-4 ${
+                  className={`bg-white rounded-2xl border p-5 shadow-xs space-y-4 ${
                     isDeviation ? 'border-rose-200 bg-rose-50/10' : 'border-slate-200'
                   }`}
                 >
@@ -520,8 +515,8 @@ export default function AuditPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     {/* Master SOP Requirement */}
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-2">
-                      <span className="font-bold text-slate-700 flex items-center gap-1.5 uppercase text-[10px] tracking-wider">
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
+                      <span className="font-bold text-slate-700 flex items-center gap-1.5 uppercase text-[10px] tracking-wider font-mono">
                         <FileText className="w-3.5 h-3.5 text-blue-600" />
                         Master IT SOP Expectation ({item.master_sop_section})
                       </span>
@@ -536,10 +531,10 @@ export default function AuditPage() {
                     </div>
 
                     {/* MES PAS-X Observed State */}
-                    <div className={`border rounded-lg p-3.5 space-y-2 ${
+                    <div className={`border rounded-xl p-3.5 space-y-2 ${
                       isDeviation ? 'bg-rose-50/40 border-rose-200' : 'bg-slate-50 border-slate-200'
                     }`}>
-                      <span className="font-bold text-slate-700 flex items-center gap-1.5 uppercase text-[10px] tracking-wider">
+                      <span className="font-bold text-slate-700 flex items-center gap-1.5 uppercase text-[10px] tracking-wider font-mono">
                         <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
                         MES PAS-X Observed Evidence (SYS-MES-001)
                       </span>
@@ -555,7 +550,7 @@ export default function AuditPage() {
                   </div>
 
                   {/* Benchmark & Corrective Action */}
-                  <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 text-xs space-y-1">
+                  <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 text-xs space-y-1">
                     <p className="font-bold text-blue-900">
                       Recommended Action: <span className="font-normal text-slate-800">{item.recommended_action}</span>
                     </p>
@@ -577,7 +572,7 @@ export default function AuditPage() {
       {/* ========================================================================= */}
       {activeTab === 'trail' && (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <div className="flex items-center gap-2">
                 <Lock className="w-6 h-6 text-emerald-600" />
@@ -592,7 +587,7 @@ export default function AuditPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-3">
-              <div className={`p-3 rounded-lg border flex items-center gap-2.5 text-xs font-semibold ${
+              <div className={`p-3 rounded-xl border flex items-center gap-2.5 text-xs font-semibold ${
                 verificationResult?.is_valid
                   ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                   : 'bg-rose-50 border-rose-300 text-rose-900'
@@ -615,7 +610,7 @@ export default function AuditPage() {
               <button
                 onClick={handleVerifyChain}
                 disabled={verifying}
-                className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition-colors shrink-0"
+                className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs transition-colors shrink-0"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${verifying ? 'animate-spin' : ''}`} />
                 {verifying ? 'Verifying SHA-256...' : 'Verify Cryptographic Chain'}
@@ -623,11 +618,11 @@ export default function AuditPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
                     <th className="py-3 px-4 w-12 text-center">#</th>
                     <th className="py-3 px-4 w-32">Timestamp</th>
                     <th className="py-3 px-4 w-28">Actor / Agent</th>
@@ -680,7 +675,7 @@ export default function AuditPage() {
       {/* QUESTION DETAIL MODAL / DRAWER */}
       {/* ========================================================================= */}
       {selectedItem && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -700,7 +695,7 @@ export default function AuditPage() {
             <div className="p-6 overflow-y-auto space-y-4 text-xs">
               {/* Question Box */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
-                <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">
+                <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px] font-mono">
                   Audit Question ({selectedItem.lifecycle_phase})
                 </span>
                 <p className="text-slate-900 font-medium text-sm leading-relaxed">
@@ -711,7 +706,7 @@ export default function AuditPage() {
               {/* Assessment Badge */}
               <div className="flex items-center gap-4">
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Assessment Status</span>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold font-mono">Status</span>
                   <div className="mt-1">
                     <span
                       className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
@@ -728,16 +723,16 @@ export default function AuditPage() {
                 </div>
 
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Severity</span>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold font-mono">Severity</span>
                   <div className="mt-1">
-                    <span className="inline-block px-2.5 py-1 rounded-md text-xs font-bold bg-purple-100 text-purple-800 border border-purple-300">
+                    <span className="inline-block px-2.5 py-1 rounded-md text-xs font-bold bg-purple-100 text-purple-800 border border-purple-300 font-mono">
                       {selectedItem.risk_level}
                     </span>
                   </div>
                 </div>
 
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Confidence</span>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold font-mono">Confidence</span>
                   <p className="text-xs font-bold text-slate-800 mt-1">
                     {Math.round(selectedItem.confidence * 100)}% (Deterministic Evidence Match)
                   </p>
@@ -747,14 +742,14 @@ export default function AuditPage() {
               {/* Gap & Root Cause */}
               {selectedItem.gap_description && (
                 <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 space-y-1 text-rose-900">
-                  <span className="font-bold uppercase tracking-wider text-[10px]">Identified Gap & Root Cause:</span>
+                  <span className="font-bold uppercase tracking-wider text-[10px] font-mono">Identified Gap & Root Cause:</span>
                   <p className="text-xs font-medium leading-relaxed">{selectedItem.gap_description}</p>
                 </div>
               )}
 
               {/* Citations */}
               <div className="space-y-1.5">
-                <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+                <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px] font-mono">
                   Evidence Citations Grounding:
                 </span>
                 <div className="space-y-1">
@@ -770,7 +765,7 @@ export default function AuditPage() {
               {/* Recommendation */}
               {selectedItem.recommendation && (
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-1 text-blue-900">
-                  <span className="font-bold uppercase tracking-wider text-[10px]">Recommended Corrective Action:</span>
+                  <span className="font-bold uppercase tracking-wider text-[10px] font-mono">Recommended Corrective Action:</span>
                   <p className="text-xs leading-relaxed">{selectedItem.recommendation}</p>
                 </div>
               )}

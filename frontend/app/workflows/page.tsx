@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   GitPullRequest, CheckCircle2, XCircle, AlertCircle, Clock,
-  ShieldCheck, RefreshCw, ExternalLink, ArrowRight, UserCheck
+  ShieldCheck, RefreshCw, ExternalLink, ArrowRight, UserCheck,
+  Lock, FileText, CheckSquare, AlertTriangle
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Workflow } from '@/lib/types';
@@ -25,7 +26,7 @@ export default function WorkflowsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const res = await api.getAllWorkflows('SYS-LIMS-001');
+      const res = await api.getAllWorkflows();
       setWorkflows(res);
     } catch (err) {
       console.error(err);
@@ -69,271 +70,304 @@ export default function WorkflowsPage() {
   };
 
   const pending = workflows.filter(w => w.status === 'PENDING_APPROVAL');
-  const executed = workflows.filter(w => w.status !== 'PENDING_APPROVAL');
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
-      </div>
-    );
-  }
+  const history = workflows.filter(w => w.status !== 'PENDING_APPROVAL');
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="border-b border-slate-200 pb-4 flex items-center justify-between">
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <GitPullRequest className="w-6 h-6 text-blue-600" />
-            <h1 className="text-xl font-bold text-slate-900">Human-in-the-Loop Approval Center</h1>
+            <GitPullRequest className="w-5 h-5 text-blue-600" />
+            <h1 className="text-lg font-bold text-slate-900">
+              Human-in-the-Loop Governance & Change Authorizations
+            </h1>
+            <span className="text-[10px] font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded">
+              {pending.length} Action Pending
+            </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Mandatory human authorization gate for all GxP actions. AI proposes; authenticated humans authorize.
+            21 CFR Part 11 Compliant Electronic Signatures & ServiceNow IT Change Gatekeeping
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded">
-            {pending.length} Pending Approval
+
+        <button
+          onClick={loadData}
+          disabled={loading}
+          className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <span>Refresh Workflows</span>
+        </button>
+      </div>
+
+      {/* GxP Governance Policy Notice */}
+      <div className="bg-gradient-to-r from-blue-900 to-[#002B49] text-white p-5 rounded-2xl shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-5 h-5 text-cyan-300" />
+          </div>
+          <div className="space-y-0.5">
+            <h2 className="text-sm font-bold">AI Proposes, Humans Authorize (ALCOA+ Safeguard)</h2>
+            <p className="text-xs text-slate-200 max-w-2xl leading-relaxed">
+              Autonomous agents continuously monitor telemetry and formulate remediation workflows. Under no circumstances does AI execute production changes without explicit QA electronic sign-off.
+            </p>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <span className="text-[11px] font-mono bg-white/15 px-2.5 py-1 rounded-md border border-white/20 font-semibold block">
+            Role: QA_COMPLIANCE
           </span>
         </div>
       </div>
 
-      {/* Pending Approvals Section */}
-      <div className="space-y-4">
-        <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wide">
-          <Clock className="w-4 h-4 text-amber-600" />
-          Pending Human Authorizations ({pending.length})
-        </h2>
+      {/* Pending Authorizations Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-amber-500" />
+            <span>Pending Authorizations Requiring QA Electronic Signature ({pending.length})</span>
+          </h2>
+        </div>
 
         {pending.length === 0 ? (
-          <div className="bg-white p-8 rounded-xl border border-slate-200 text-center shadow-sm">
-            <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-            <p className="text-sm font-bold text-slate-800">No Pending Approvals</p>
-            <p className="text-xs text-slate-500 mt-1">All AI recommendations have either been authorized or addressed.</p>
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-500 space-y-2">
+            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+            <p className="text-sm font-semibold text-slate-800">All GxP Workflows Authorized</p>
+            <p className="text-xs text-slate-400">There are no outstanding human-in-the-loop approvals queued.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {pending.map((wf) => {
-              const recTitle = wf.payload_json?.recommendation_title || 'Route URS for formal QA sign-off';
-              const priority = wf.payload_json?.priority || 'CRITICAL';
-              return (
-                <div key={wf.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                    <div className="flex items-center gap-2.5">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        priority === 'CRITICAL' ? 'bg-rose-100 text-rose-800 border border-rose-200' : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {priority}
+            {pending.map(wf => (
+              <div
+                key={wf.id}
+                className="bg-white rounded-2xl border border-amber-200/80 shadow-xs p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 bg-gradient-to-r from-amber-50/20 to-white"
+              >
+                <div className="space-y-2 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold px-2 py-0.5 rounded font-mono">
+                      PENDING AUTHORIZATION
+                    </span>
+                    <span className="font-mono text-xs font-bold text-slate-800">{wf.id}</span>
+                    <span className="text-slate-400">•</span>
+                    <span className="font-mono text-xs text-blue-700 font-semibold">{wf.system_id}</span>
+                  </div>
+
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {wf.type || 'SOP Remediation & Gap Closure'}
+                  </h3>
+
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {wf.payload_json?.action_summary || wf.payload_json?.title || 'Remediation proposed by AI Compliance Engine. Automated analysis determined corrective action is required before Gate G5 can be satisfied.'}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-2 text-xs pt-1">
+                    <span className="font-mono text-[10.5px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                      Target: {wf.payload_json?.target || 'PAS-X Configuration'}
+                    </span>
+                    {wf.payload_json?.citation && (
+                      <span className="font-mono text-[10.5px] bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded">
+                        {wf.payload_json.citation}
                       </span>
-                      <h3 className="text-sm font-bold text-slate-900">{recTitle}</h3>
-                    </div>
-                    <span className="text-xs font-mono text-slate-400">Target: SYS-LIMS-001</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                    <div>
-                      <span className="text-[10px] font-semibold text-slate-400 uppercase">GxP Justification:</span>
-                      <p className="text-slate-800 mt-1 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                        Operating an unapproved User Requirements Specification invalidates system qualification baseline under 21 CFR Part 11 and EU Annex 11.
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-semibold text-slate-400 uppercase">Primary Evidence Citation:</span>
-                      <p className="text-slate-700 mt-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200 font-mono text-[11px]">
-                        System_A_URS.docx (Section 6: Document Approvals & Signatures) — QA signature MISSING.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                      <UserCheck className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Requested for QA Review | Created: {new Date(wf.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedWf(wf);
-                          setRejectModalOpen(true);
-                        }}
-                        className="px-3.5 py-1.5 border border-rose-300 text-rose-700 hover:bg-rose-50 rounded-lg text-xs font-semibold transition-colors"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedWf(wf);
-                          setApproveModalOpen(true);
-                        }}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-colors"
-                      >
-                        Approve & Execute Task
-                      </button>
-                    </div>
+                    )}
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
+                  <button
+                    onClick={() => {
+                      setSelectedWf(wf);
+                      setRejectModalOpen(true);
+                    }}
+                    className="bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    <span>Reject</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setSelectedWf(wf);
+                      setApproveModalOpen(true);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    <span>Authorize & Execute (21 CFR Part 11)</span>
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* History of Executed Workflows */}
-      {executed.length > 0 && (
-        <div className="space-y-4 pt-4 border-t border-slate-200">
-          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wide">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            Executed GxP Actions History ({executed.length})
+      {/* Historical Workflows Ledger */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-900">
+            Completed Lifecycle Changes & Approvals Ledger ({history.length})
           </h2>
-
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <table className="w-full text-left text-xs text-slate-700">
-              <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="py-3 px-4 font-semibold">Workflow Action</th>
-                  <th className="py-3 px-4 font-semibold">Status</th>
-                  <th className="py-3 px-4 font-semibold">Authorized By</th>
-                  <th className="py-3 px-4 font-semibold">Enterprise Execution</th>
-                  <th className="py-3 px-4 font-semibold text-right">Timestamp</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {executed.map((wf) => {
-                  const isApproved = wf.status === 'APPROVED';
-                  const ticketId = wf.payload_json?.ticket_id || wf.payload_json?.snow_ticket?.ticket_id || 'SNOW-TASK-1001';
-                  return (
-                    <tr key={wf.id} className="hover:bg-slate-50">
-                      <td className="py-3 px-4 font-semibold text-slate-900">
-                        {wf.payload_json?.recommendation_title || 'Route URS for formal QA approval'}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          isApproved ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                        }`}>
-                          {wf.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600">{wf.approved_by || 'qa@demo.local'}</td>
-                      <td className="py-3 px-4">
-                        {isApproved ? (
-                          <div className="flex items-center gap-1.5 font-bold text-blue-700 font-mono text-[11px]">
-                            <span>ServiceNow:</span>
-                            <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200">
-                              {ticketId}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic">Rejection: {wf.rejection_reason || 'Rejected by QA'}</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-right text-slate-500 text-[11px]">
-                        {new Date(wf.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <span className="text-xs text-slate-400 font-mono">ServiceNow Synced</span>
         </div>
-      )}
 
-      {/* Approve Confirmation Modal */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                <th className="py-3 px-4 w-28">Workflow ID</th>
+                <th className="py-3 px-4 w-28">System</th>
+                <th className="py-3 px-4">Action Summary</th>
+                <th className="py-3 px-4 w-28 text-center">Status</th>
+                <th className="py-3 px-4 w-40">Approver / QA Sign-off</th>
+                <th className="py-3 px-4 w-36">Change Ticket</th>
+                <th className="py-3 px-4 w-32">Timestamp</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {history.map(w => {
+                const isApproved = w.status === 'APPROVED';
+                return (
+                  <tr key={w.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3 px-4 font-mono font-bold text-slate-800">{w.id}</td>
+                    <td className="py-3 px-4 font-mono text-slate-700">{w.system_id}</td>
+                    <td className="py-3 px-4 text-slate-800">
+                      <p className="font-semibold">{w.type}</p>
+                      <p className="text-[11px] text-slate-500 line-clamp-1">
+                        {w.payload_json?.action_summary || w.rejection_reason || 'Authorization granted'}
+                      </p>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span
+                        className={`inline-block px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${
+                          isApproved
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-rose-100 text-rose-800 border border-rose-300'
+                        }`}
+                      >
+                        {w.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-slate-600 font-mono text-[11px]">
+                      {w.approved_by || 'qa@demo.local'}
+                    </td>
+                    <td className="py-3 px-4 font-mono text-[11px] text-blue-700">
+                      {w.payload_json?.servicenow_ticket ? (
+                        <span className="bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                          {w.payload_json.servicenow_ticket}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">N/A</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-slate-500 text-[11px]">
+                      {w.approved_at ? new Date(w.approved_at).toLocaleDateString() : 'Recent'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* APPROVE MODAL */}
       {approveModalOpen && selectedWf && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 space-y-4">
-            <div className="flex items-center gap-2.5 text-slate-900 border-b border-slate-100 pb-3">
-              <ShieldCheck className="w-6 h-6 text-emerald-600" />
-              <h3 className="text-base font-bold">Authorize GxP Action</h3>
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                <UserCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">21 CFR Part 11 Electronic Signature</h3>
+                <p className="text-xs text-slate-500">Formal authorization of GxP change</p>
+              </div>
             </div>
 
-            {/* Regulatory Notice Banner */}
-            <div className="bg-blue-50 border border-blue-200 text-blue-900 p-3 rounded-lg text-xs leading-relaxed">
-              <p className="font-bold mb-0.5">Mandatory GxP Authorization Statement:</p>
-              You are approving an AI-generated workflow. The AI recommendation will not become effective until this human approval is recorded in the tamper-evident audit ledger.
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1">
+              <p className="font-bold text-slate-800">{selectedWf.type || 'SOP Remediation'}</p>
+              <p className="text-slate-600 font-mono text-[11px]">Target: {selectedWf.system_id}</p>
             </div>
 
-            <div className="text-xs text-slate-600 space-y-2">
-              <p><b>Target Action:</b> {selectedWf.payload_json?.recommendation_title || 'Route URS for formal QA sign-off'}</p>
-              <p><b>Target System:</b> SYS-LIMS-001 (Validated LIMS)</p>
-              <p><b>Authorizer:</b> Dr. Elena Rostova (qa@demo.local)</p>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-                Approval Justification Comment:
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                QA Authorization Justification & Comments:
               </label>
               <textarea
                 rows={3}
                 value={approvalComment}
-                onChange={(e) => setApprovalComment(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={e => setApprovalComment(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-[11px] text-blue-900 space-y-1">
+              <span className="font-bold block">Attestation:</span>
+              <p>
+                By clicking Authorize, I certify under 21 CFR Part 11 that I have reviewed the qualification evidence, verified the remediation action, and approve this release workflow.
+              </p>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2">
               <button
                 onClick={() => setApproveModalOpen(false)}
-                disabled={actionLoading}
-                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-100"
+                className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-xs font-semibold"
               >
                 Cancel
               </button>
               <button
                 onClick={handleApprove}
                 disabled={actionLoading}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs disabled:opacity-50"
               >
-                {actionLoading ? 'Recording Approval...' : 'Confirm Authorization & Create Ticket'}
+                {actionLoading ? 'Signing & Linking...' : 'Sign & Authorize'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Reject Modal */}
+      {/* REJECT MODAL */}
       {rejectModalOpen && selectedWf && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 space-y-4">
-            <div className="flex items-center gap-2.5 text-slate-900 border-b border-slate-100 pb-3">
-              <XCircle className="w-6 h-6 text-rose-600" />
-              <h3 className="text-base font-bold">Reject GxP Workflow</h3>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                <XCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Reject GxP Proposed Action</h3>
+                <p className="text-xs text-slate-500">Provide regulatory justification for audit trail</p>
+              </div>
             </div>
 
-            <div className="bg-rose-50 border border-rose-200 text-rose-900 p-3 rounded-lg text-xs">
-              Under GxP compliance rules, a written justification reason is mandatory for any rejected workflow.
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-                Mandatory Rejection Reason:
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Regulatory Rejection Reason (Mandatory):
               </label>
               <textarea
                 rows={3}
                 value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="State the regulatory or technical basis for rejecting this recommendation..."
-                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                onChange={e => setRejectionReason(e.target.value)}
+                placeholder="State why this recommendation cannot be authorized..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+            <div className="pt-2 flex items-center justify-end gap-2">
               <button
                 onClick={() => setRejectModalOpen(false)}
-                disabled={actionLoading}
-                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-100"
+                className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-xs font-semibold"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReject}
                 disabled={actionLoading || !rejectionReason.trim()}
-                className="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs disabled:opacity-50"
               >
-                {actionLoading ? 'Recording...' : 'Confirm Rejection'}
+                {actionLoading ? 'Rejecting...' : 'Confirm Rejection'}
               </button>
             </div>
           </div>

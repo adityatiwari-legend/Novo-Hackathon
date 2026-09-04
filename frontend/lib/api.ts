@@ -31,7 +31,7 @@ export const api = {
     fetchJson<Document[]>(`/documents${systemId ? `?system_id=${systemId}` : ''}`),
   getDocument: (id: string) => fetchJson<Document>(`/documents/${id}`),
   getDocumentChunks: (id: string) => fetchJson<DocumentChunk[]>(`/documents/${id}/chunks`),
-  uploadDocument: async (file: File, systemId: string = 'SYS-LIMS-001') => {
+  uploadDocument: async (file: File, systemId: string = 'SYS-MES-001') => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('system_id', systemId);
@@ -100,15 +100,15 @@ export const api = {
     }),
 
   // Risks & Recommendations
-  getRisks: (systemId: string = 'SYS-LIMS-001') =>
+  getRisks: (systemId: string = 'SYS-MES-001') =>
     fetchJson<Risk[]>(`/risk?system_id=${systemId}`),
-  getRecommendations: (systemId: string = 'SYS-LIMS-001') =>
+  getRecommendations: (systemId: string = 'SYS-MES-001') =>
     fetchJson<Recommendation[]>(`/recommendations?system_id=${systemId}`),
 
   // Evidence Packs
   getEvidencePacks: (systemId?: string) =>
     fetchJson<EvidencePack[]>(`/evidence${systemId ? `?system_id=${systemId}` : ''}`),
-  generateEvidencePack: (systemId: string = 'SYS-LIMS-001') =>
+  generateEvidencePack: (systemId: string = 'SYS-MES-001') =>
     fetchJson<any>('/evidence/generate', {
       method: 'POST',
       body: JSON.stringify({ system_id: systemId }),

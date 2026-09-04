@@ -1,171 +1,281 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
 import {
-  ShieldAlert, AlertTriangle, CheckCircle2, FileText, ArrowRight,
-  Sparkles, RefreshCw, Shield, ChevronDown, ChevronRight
+  AlertOctagon, AlertTriangle, ShieldCheck, ShieldAlert,
+  Filter, Search, ArrowRight, RefreshCw, CheckCircle2,
+  FileText, ExternalLink, HelpCircle
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Risk } from '@/lib/types';
 
 export default function RiskPage() {
   const [risks, setRisks] = useState<Risk[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
+  const [filterSeverity, setFilterSeverity] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const loadRisks = async () => {
+    try {
+      setLoading(true);
+      const data = await api.getRisks('SYS-MES-001');
+      setRisks(data);
+      if (data.length > 0) setSelectedRisk(data[0]);
+    } catch (err) {
+      console.error('Failed to load risks:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    api.getRisks('SYS-LIMS-001')
-      .then(res => {
-        setRisks(res);
-        if (res.length > 0) setSelectedRisk(res[0]);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    loadRisks();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
-      </div>
-    );
-  }
+  const filteredRisks = risks.filter(r => {
+    const matchesSev = filterSeverity === 'ALL' || r.risk_level?.toUpperCase() === filterSeverity;
+    const matchesSearch =
+      !searchQuery ||
+      r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.impact_type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.rationale && r.rationale.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesSev && matchesSearch;
+  });
 
-  const highCount = risks.filter(r => r.risk_level === 'HIGH' || r.risk_level === 'CRITICAL').length;
-  const medCount = risks.filter(r => r.risk_level === 'MEDIUM').length;
-  const lowCount = risks.filter(r => r.risk_level === 'LOW').length;
+  const highCount = risks.filter(r => r.risk_level?.toUpperCase() === 'HIGH' || r.risk_level?.toUpperCase() === 'CRITICAL').length;
+  const medCount = risks.filter(r => r.risk_level?.toUpperCase() === 'MEDIUM').length;
+  const lowCount = risks.filter(r => r.risk_level?.toUpperCase() === 'LOW').length;
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="border-b border-slate-200 pb-4 flex items-center justify-between">
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">GxP IT Risk Assessment Register</h1>
+          <div className="flex items-center gap-2">
+            <AlertOctagon className="w-5 h-5 text-rose-600" />
+            <h1 className="text-lg font-bold text-slate-900">
+              ICH Q9 Quality Risk Management Register
+            </h1>
+            <span className="text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded">
+              SYS-MES-001
+            </span>
+          </div>
           <p className="text-xs text-slate-500 mt-1">
-            ICH Q9 Quality Risk Management matrix evaluating GxP patient safety, data integrity, and operational impact.
+            Hazard evaluation and residual risk assessment for Novo Life MES PAS-X (GAMP Category 4)
           </p>
         </div>
+
         <div className="flex items-center gap-2">
-          <span className="bg-rose-100 text-rose-800 text-xs font-bold px-2.5 py-1 rounded">
-            {highCount} High Risk
-          </span>
-          <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded">
-            {medCount} Moderate
-          </span>
+          <button
+            onClick={loadRisks}
+            disabled={loading}
+            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Reload Hazards</span>
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Risk Register Table (Left 2 Cols) */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-200">
-            <h2 className="text-sm font-bold text-slate-900">Active Hazards & Risk Matrix</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-700">
-              <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="py-3 px-4 font-semibold">Hazard / Finding</th>
-                  <th className="py-3 px-4 font-semibold">Risk Level</th>
-                  <th className="py-3 px-4 font-semibold">Impact Type</th>
-                  <th className="py-3 px-4 font-semibold">Score</th>
-                  <th className="py-3 px-4 font-semibold text-right">Details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {risks.map((r) => {
-                  const isSelected = selectedRisk?.id === r.id;
-                  return (
-                    <tr
-                      key={r.id}
-                      onClick={() => setSelectedRisk(r)}
-                      className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/60 font-semibold' : 'hover:bg-slate-50/70'}`}
-                    >
-                      <td className="py-3 px-4">
-                        <div className="text-slate-900 font-medium">{r.rationale.slice(0, 50)}...</div>
-                        <div className="text-[10px] text-slate-400 font-mono">Control: {r.control_mapping || 'ICH Q9'}</div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          r.risk_level === 'HIGH'
-                            ? 'bg-rose-100 text-rose-800'
-                            : r.risk_level === 'MEDIUM'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+          <span className="text-[11px] font-bold text-slate-400 uppercase font-mono">Total Hazards</span>
+          <p className="text-2xl font-black text-slate-900 mt-1 tabular-nums">{risks.length}</p>
+          <span className="text-[10px] text-slate-500">ICH Q9 cataloged</span>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-rose-200 shadow-xs bg-rose-50/20">
+          <span className="text-[11px] font-bold text-rose-700 uppercase font-mono">High / Critical</span>
+          <p className="text-2xl font-bold text-rose-700 mt-1 tabular-nums">{highCount}</p>
+          <span className="text-[10px] text-rose-600 font-semibold">Requires formal verification</span>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-xs bg-amber-50/20">
+          <span className="text-[11px] font-bold text-amber-700 uppercase font-mono">Medium Hazards</span>
+          <p className="text-2xl font-bold text-amber-700 mt-1 tabular-nums">{medCount}</p>
+          <span className="text-[10px] text-amber-600">SOP control mapped</span>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-xs bg-emerald-50/20">
+          <span className="text-[11px] font-bold text-emerald-700 uppercase font-mono">Low Hazards</span>
+          <p className="text-2xl font-bold text-emerald-700 mt-1 tabular-nums">{lowCount}</p>
+          <span className="text-[10px] text-emerald-600">Acceptable residual risk</span>
+        </div>
+      </div>
+
+      {/* Split View: Hazard Register Table & Deep-Dive Inspector */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left 7 cols: Hazard List */}
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between overflow-hidden">
+          <div>
+            <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {['ALL', 'HIGH', 'MEDIUM', 'LOW'].map(sev => (
+                  <button
+                    key={sev}
+                    onClick={() => setFilterSeverity(sev)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                      filterSeverity === sev
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {sev}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative sm:w-60">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Filter hazards..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="divide-y divide-slate-100 max-h-[560px] overflow-y-auto">
+              {filteredRisks.map(r => {
+                const isSelected = selectedRisk?.id === r.id;
+                const isHigh = r.risk_level?.toUpperCase() === 'HIGH' || r.risk_level?.toUpperCase() === 'CRITICAL';
+
+                return (
+                  <div
+                    key={r.id}
+                    onClick={() => setSelectedRisk(r)}
+                    className={`p-4 cursor-pointer transition-all space-y-1.5 ${
+                      isSelected
+                        ? 'bg-blue-50/70 border-l-4 border-blue-600'
+                        : 'hover:bg-slate-50/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-[9.5px] font-bold px-2 py-0.5 rounded font-mono ${
+                            isHigh
+                              ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                              : 'bg-amber-100 text-amber-800 border border-amber-300'
+                          }`}
+                        >
                           {r.risk_level}
                         </span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-600">{r.impact_type}</td>
-                      <td className="py-3 px-4 font-bold text-slate-900">{r.score} / 25</td>
-                      <td className="py-3 px-4 text-right">
-                        <span className="text-blue-600 text-xs font-semibold">Inspect →</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <span className="font-mono text-xs font-bold text-slate-800">{r.id}</span>
+                      </div>
+                      <span className="text-[10.5px] font-mono text-slate-400">
+                        Score: <b className="text-slate-800">{r.score || 16}/25</b>
+                      </span>
+                    </div>
+
+                    <h3 className="text-xs font-bold text-slate-900 leading-snug">{r.impact_type || 'Hazard Scenario'}</h3>
+                    <p className="text-[11px] text-slate-500 line-clamp-1">{r.rationale}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="p-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500">
+            Showing {filteredRisks.length} of {risks.length} recorded hazards
           </div>
         </div>
 
-        {/* Selected Risk Inspection Card (Right 1 Col) */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hazard Breakdown</span>
-            {selectedRisk && (
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                selectedRisk.risk_level === 'HIGH' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-              }`}>
-                {selectedRisk.risk_level} IMPACT
-              </span>
-            )}
-          </div>
-
+        {/* Right 5 cols: Hazard Deep-Dive Inspector */}
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-5">
           {selectedRisk ? (
-            <div className="space-y-3 text-xs">
-              <div>
-                <span className="text-[10px] font-semibold text-slate-400 uppercase">GxP Risk Rationale:</span>
-                <p className="text-slate-800 mt-1 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <>
+              <div className="border-b border-slate-100 pb-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-xs bg-slate-100 text-slate-800 px-2 py-0.5 rounded">
+                    {selectedRisk.id}
+                  </span>
+                  <span
+                    className={`text-xs font-bold px-2.5 py-0.5 rounded font-mono ${
+                      selectedRisk.risk_level?.toUpperCase() === 'HIGH' || selectedRisk.risk_level?.toUpperCase() === 'CRITICAL'
+                        ? 'bg-rose-100 text-rose-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {selectedRisk.risk_level} RISK
+                  </span>
+                </div>
+                <h2 className="text-base font-bold text-slate-900 leading-tight">
+                  {selectedRisk.impact_type || 'System Hazard Assessment'}
+                </h2>
+              </div>
+
+              {/* 5x5 Matrix Assessment */}
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3">
+                <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 font-mono block">
+                  ICH Q9 Matrix Rating
+                </span>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-white p-2 rounded-lg border border-slate-200">
+                    <span className="text-[10px] text-slate-400 font-mono block">LIKELIHOOD</span>
+                    <span className="text-xs font-bold text-slate-800">
+                      {selectedRisk.likelihood || 'Possible (3/5)'}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-200">
+                    <span className="text-[10px] text-slate-400 font-mono block">SEVERITY</span>
+                    <span className="text-xs font-bold text-slate-800">
+                      {selectedRisk.impact || 'Critical (4/5)'}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-200">
+                    <span className="text-[10px] text-slate-400 font-mono block">RPN SCORE</span>
+                    <span className="text-xs font-black text-rose-700 tabular-nums">
+                      {selectedRisk.score || 16}/25
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rationale */}
+              <div className="space-y-1 text-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                  Failure Mode & Clinical Impact:
+                </span>
+                <p className="text-slate-800 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-200">
                   {selectedRisk.rationale}
                 </p>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                  <span className="text-[10px] text-slate-400 block">Likelihood</span>
-                  <span className="font-bold text-slate-800 text-xs">{selectedRisk.likelihood}</span>
+              {/* Mitigations */}
+              {selectedRisk.control_mapping && (
+                <div className="space-y-1 text-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                    Established Regulatory Control & Mitigation:
+                  </span>
+                  <div className="bg-emerald-50/60 border border-emerald-200 p-3.5 rounded-xl text-emerald-950 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Mitigation Strategy</span>
+                    </div>
+                    <p className="text-xs leading-relaxed">{selectedRisk.control_mapping}</p>
+                  </div>
                 </div>
-                <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                  <span className="text-[10px] text-slate-400 block">Impact</span>
-                  <span className="font-bold text-slate-800 text-xs">{selectedRisk.impact}</span>
-                </div>
-                <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                  <span className="text-[10px] text-slate-400 block">Matrix Score</span>
-                  <span className="font-bold text-rose-600 text-xs">{selectedRisk.score}/25</span>
-                </div>
-              </div>
+              )}
 
-              <div>
-                <span className="text-[10px] font-semibold text-slate-400 uppercase">Regulatory Control Standard:</span>
-                <p className="text-slate-700 mt-1 font-mono text-[11px] bg-slate-50 p-2 rounded border border-slate-200">
-                  {selectedRisk.control_mapping || 'ICH Q9 Quality Risk Management'}
-                </p>
+              {/* Release Blocker Note */}
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block">Gate G5 Hold Condition:</span>
+                  <p className="text-[11px] text-rose-800">
+                    Residual risk ratings must be signed off by QA_COMPLIANCE before Gate G6 Operational Activation.
+                  </p>
+                </div>
               </div>
-
-              <div className="pt-3 border-t border-slate-100">
-                <Link
-                  href="/compliance"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <span>Remediate in Compliance Screen</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            </div>
+            </>
           ) : (
-            <p className="text-xs text-slate-400 text-center py-8">Select a risk to inspect details.</p>
+            <div className="h-96 flex flex-col items-center justify-center text-center text-slate-400 space-y-2">
+              <AlertOctagon className="w-8 h-8 text-slate-300" />
+              <p className="text-xs font-semibold text-slate-600">No Hazard Selected</p>
+              <p className="text-[11px] text-slate-400">Select any hazard on the left to inspect its ICH Q9 matrix assessment.</p>
+            </div>
           )}
         </div>
       </div>
