@@ -13,11 +13,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onSimulationTriggered }) => {
   const [simulationActive, setSimulationActive] = useState(false);
   const [isTriggering, setIsTriggering] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [readinessScore, setReadinessScore] = useState<number | null>(null);
+
+  const fetchReadiness = async () => {
+    try {
+      const data = await api.getReadiness();
+      setReadinessScore(data.readiness_score);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   useEffect(() => {
     api.getSimulationStatus()
       .then(res => setSimulationActive(res.simulation_active))
       .catch(() => {});
+    fetchReadiness();
   }, []);
 
   const handleToggleSimulation = async () => {
@@ -26,11 +37,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onSimulationTriggered }) => {
       if (simulationActive) {
         await api.resetSimulation();
         setSimulationActive(false);
-        setNotification('Simulation reset: Baseline readiness restored to 82%.');
+        const data = await api.getReadiness();
+        setReadinessScore(data.readiness_score);
+        setNotification(`Simulation reset: Baseline readiness restored to ${data.readiness_score}%.`);
       } else {
         const res = await api.triggerSimulation();
         setSimulationActive(true);
-        setNotification(res.notification || 'SOP Review Expired: Readiness dropped from 82% to 76%.');
+        const data = await api.getReadiness();
+        setReadinessScore(data.readiness_score);
+        setNotification(res.notification || `SOP Review Expired: Readiness dropped to ${data.readiness_score}%.`);
       }
       if (onSimulationTriggered) {
         onSimulationTriggered();
@@ -97,7 +112,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onSimulationTriggered }) => {
             title="Simulate continuous document expiration telemetry without waiting for real calendar dates"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isTriggering ? 'animate-spin' : ''}`} />
-            {simulationActive ? 'Reset Simulation (82%)' : 'Simulate SOP Expiration (82% → 76%)'}
+            {simulationActive 
+              ? `Reset Simulation${readinessScore !== null ? ` (${readinessScore}%)` : ''}` 
+              : `Simulate SOP Expiration${readinessScore !== null ? ` (${readinessScore}%)` : ''}`}
           </button>
           
           <div className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1 rounded border border-slate-700 text-xs text-slate-300">

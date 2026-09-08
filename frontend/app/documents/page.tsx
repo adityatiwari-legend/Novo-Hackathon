@@ -19,7 +19,7 @@ export default function DocumentsPage() {
   const loadDocs = async () => {
     try {
       setLoading(true);
-      const docs = await api.getDocuments('SYS-LIMS-001');
+      const docs = await api.getDocuments('SYS-MES-001');
       setDocuments(docs);
       if (docs.length > 0 && !selectedDoc) {
         setSelectedDoc(docs[0]);
@@ -50,7 +50,7 @@ export default function DocumentsPage() {
     setUploading(true);
     setUploadMsg('Validating file checksum, extracting metadata, and indexing chunks in vector store...');
     try {
-      const doc = await api.uploadDocument(file, 'SYS-LIMS-001');
+      const doc = await api.uploadDocument(file, 'SYS-MES-001');
       setUploadMsg(`Successfully ingested ${doc.title} with SHA-256 checksum!`);
       await loadDocs();
       setSelectedDoc(doc);
@@ -112,7 +112,7 @@ export default function DocumentsPage() {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
           <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
             <span className="text-xs font-bold text-slate-900">Indexed Documents ({documents.length})</span>
-            <span className="text-[10px] text-slate-400 font-mono">SYS-LIMS-001</span>
+            <span className="text-[10px] text-slate-400 font-mono">SYS-MES-001</span>
           </div>
           <div className="divide-y divide-slate-100 overflow-y-auto max-h-[600px]">
             {documents.map((doc) => {

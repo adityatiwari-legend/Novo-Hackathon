@@ -14,13 +14,13 @@ from backend.app.agents.supervisor import supervisor_agent
 router = APIRouter(prefix="/evidence", tags=["Audit Evidence"])
 
 class GenerateEvidenceRequest(BaseModel):
-    system_id: str = "SYS-LIMS-001"
+    system_id: str = "SYS-MES-001"
     actor: str = "qa@demo.local"
 
 @router.post("/generate")
 def generate_evidence_pack(req: GenerateEvidenceRequest, db: Session = Depends(get_db)):
     system = db.query(System).filter(System.id == req.system_id).first()
-    system_name = system.name if system else "Validated LIMS"
+    system_name = system.name if system else "Novo Life MES PAS-X"
     
     # Run assessment to gather fresh data
     pipeline_res = supervisor_agent.run_assessment_pipeline(

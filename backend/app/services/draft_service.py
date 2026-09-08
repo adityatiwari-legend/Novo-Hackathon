@@ -24,8 +24,8 @@ class DraftService:
     def generate_draft_section(
         self,
         section_name: str = "6. QA Approval & Validation Sign-Off",
-        document_title: str = "System_A_URS.docx",
-        system_name: str = "System A: Validated LIMS",
+        document_title: str = "NL-MES-URS-001.docx",
+        system_name: str = "Novo Life MES PAS-X",
         finding_context: str = "QA approval missing from URS."
     ) -> Dict[str, Any]:
         """

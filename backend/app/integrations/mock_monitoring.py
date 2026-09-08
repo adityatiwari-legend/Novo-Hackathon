@@ -1,37 +1,41 @@
 from typing import Dict, Any
 from sqlalchemy.orm import Session
-from backend.app.models.entities import Document, ComplianceFinding, Recommendation, create_audit_log
+from backend.app.models.entities import System, Document, ComplianceFinding, Recommendation, create_audit_log
 from backend.app.services.compliance_engine import compliance_engine
 
 class ContinuousComplianceMonitor:
     def __init__(self):
         self.simulation_active = False
 
-    def trigger_document_expiration_event(self, db: Session, system_id: str = "SYS-LIMS-001") -> Dict[str, Any]:
+    def trigger_document_expiration_event(self, db: Session, system_id: str = "SYS-MES-001") -> Dict[str, Any]:
         """
         Simulates an asynchronous background compliance trigger:
-        SOP_Document_Management.docx periodic review expires.
-        Transitions document status to 'Overdue', re-evaluates compliance (82% -> 76%),
+        SOP periodic review expires.
+        Transitions document status to 'Overdue', re-evaluates compliance,
         adds finding and recommendation, logs tamper-evident audit event.
         """
         # Find SOP document
         doc = db.query(Document).filter(
             Document.system_id == system_id,
-            Document.title.ilike("%SOP_Document_Management%")
+            Document.document_type == "SOP"
         ).first()
         
         if not doc:
-            # Fallback to any SOP
-            doc = db.query(Document).filter(Document.document_type == "SOP").first()
+            # Fallback to any Document
+            doc = db.query(Document).filter(Document.system_id == system_id).first()
             
         doc_title = doc.title if doc else "SOP_Document_Management.docx"
+        
+        sys = db.query(System).filter(System.id == system_id).first()
+        initial_score = sys.readiness_score if sys else 82
+
         if doc:
             doc.status = "Overdue"
             db.commit()
             
         # Re-evaluate compliance
         eval_result = compliance_engine.evaluate_system(db, system_id)
-        new_score = eval_result["readiness_score"]  # 82 - 6 = 76!
+        new_score = eval_result["readiness_score"]
         
         finding_title = f"Document Review Overdue: {doc_title}"
         existing_finding = db.query(ComplianceFinding).filter(
@@ -82,9 +86,9 @@ class ContinuousComplianceMonitor:
             details={
                 "event": "SOP_PERIODIC_REVIEW_OVERDUE",
                 "document": doc_title,
-                "previous_readiness": 82,
+                "previous_readiness": initial_score,
                 "new_readiness": new_score,
-                "score_delta": -6
+                "score_delta": new_score - initial_score
             },
             agent_name="continuous_compliance_monitor"
         )
@@ -94,16 +98,16 @@ class ContinuousComplianceMonitor:
             "event": "SOP_PERIODIC_REVIEW_EXPIRED",
             "system_id": system_id,
             "document_affected": doc_title,
-            "previous_readiness": 82,
+            "previous_readiness": initial_score,
             "new_readiness": new_score,
             "notification": f"New compliance gap detected: {doc_title} is overdue for periodic review. Readiness score decreased to {new_score}%."
         }
 
-    def reset_simulation(self, db: Session, system_id: str = "SYS-LIMS-001") -> Dict[str, Any]:
+    def reset_simulation(self, db: Session, system_id: str = "SYS-MES-001") -> Dict[str, Any]:
         """Resets the document status back to Effective and removes simulated findings."""
         doc = db.query(Document).filter(
             Document.system_id == system_id,
-            Document.title.ilike("%SOP_Document_Management%")
+            Document.status == "Overdue"
         ).first()
         if doc:
             doc.status = "Effective"
@@ -117,6 +121,9 @@ class ContinuousComplianceMonitor:
         db.commit()
         
         self.simulation_active = False
-        return {"status": "reset", "readiness_score": 82}
+        
+        # Re-evaluate to get the correct score back
+        eval_result = compliance_engine.evaluate_system(db, system_id)
+        return {"status": "reset", "readiness_score": eval_result["readiness_score"]}
 
 continuous_monitor = ContinuousComplianceMonitor()

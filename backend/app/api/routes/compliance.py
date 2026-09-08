@@ -33,11 +33,13 @@ def run_compliance_assessment(req: AssessRequest, db: Session = Depends(get_db))
 @router.get("/compliance/readiness/{system_id}")
 def get_system_readiness(system_id: str, db: Session = Depends(get_db)):
     eval_result = compliance_engine.evaluate_system(db, system_id)
+    gate_res = release_gate_engine.evaluate_release_gates(db, system_id)
+    
     return {
         "system_id": system_id,
         "readiness_score": eval_result["readiness_score"],
-        "release_recommendation": eval_result.get("release_recommendation", "HOLD / DEFER - DO NOT RELEASE"),
-        "lifecycle_status": eval_result.get("lifecycle_status", "PRE-OPERATIONAL / NOT ACTIVATED"),
+        "release_recommendation": gate_res.get("overall_decision", "HOLD"),
+        "lifecycle_status": gate_res.get("lifecycle_status", "PRE-OPERATIONAL / NOT ACTIVATED"),
         "total_checks": eval_result["total_checks"],
         "passed_checks": eval_result["passed_checks"],
         "failed_checks": eval_result["failed_checks"],

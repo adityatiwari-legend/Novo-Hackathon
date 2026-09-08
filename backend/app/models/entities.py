@@ -28,18 +28,23 @@ class User(Base):
 class System(Base):
     __tablename__ = "systems"
     
-    id = Column(String(50), primary_key=True)  # e.g., 'SYS-LIMS-001' or uuid
+    id = Column(String(50), primary_key=True)  # e.g., 'SYS-MES-001' or uuid
     name = Column(String(200), nullable=False)
+    type = Column(String(100), nullable=True)
     description = Column(Text, nullable=True)
+    owner = Column(String(150), nullable=True)
     owner_id = Column(String(36), nullable=True)
     criticality = Column(String(50), default="GxP-Critical")  # GxP-Critical, Non-Critical
     gxp_status = Column(String(50), default="GxP")
     business_owner = Column(String(150), nullable=True)
+    source = Column(String(150), nullable=True)
     lifecycle_status = Column(String(100), default="PRE-OPERATIONAL / NOT ACTIVATED")
+    lifecycle_state = Column(String(100), nullable=True)
     release_recommendation = Column(String(100), default="HOLD / DEFER - DO NOT RELEASE")
     readiness_score = Column(Integer, default=48)
     last_assessed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=get_utc_now)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
     
     documents = relationship("Document", back_populates="system")
 
@@ -47,23 +52,59 @@ class Document(Base):
     __tablename__ = "documents"
     
     id = Column(String(36), primary_key=True, default=generate_uuid)
+    document_id = Column(String(100), nullable=True)
     title = Column(String(255), nullable=False)
     document_type = Column(String(50), nullable=False)  # URS, RISK_ASSESSMENT, SOP, POLICY
     system_id = Column(String(50), ForeignKey("systems.id"), nullable=True)
     version = Column(String(50), default="1.0")
+    lifecycle_sequence = Column(Integer, nullable=True)
+    owner = Column(String(150), nullable=True)
     owner_id = Column(String(150), nullable=True)
+    reviewer = Column(String(150), nullable=True)
+    approver = Column(String(150), nullable=True)
     status = Column(String(50), default="Draft")  # Draft, Effective, Archived, Overdue
     review_date = Column(String(50), nullable=True)
-    approval_status = Column(String(50), default="Pending")  # Approved, Pending, Rejected, Not found
-    source_system = Column(String(100), default="Local Upload")  # Vault, SharePoint, ServiceNow, Local Upload
-    file_path = Column(String(500), nullable=False)
-    checksum = Column(String(64), nullable=False)  # SHA-256
+    review_due = Column(DateTime, nullable=True)
+    issue_date = Column(DateTime, nullable=True)
+    effective_from = Column(DateTime, nullable=True)
+    effective_to = Column(DateTime, nullable=True)
+    approval_status = Column(String(50), default="Pending")
+    source_system = Column(String(100), default="Local Upload")
+    source_filename = Column(String(255), nullable=True)
+    source_path = Column(String(500), nullable=True)
+    file_path = Column(String(500), nullable=True) # legacy
+    checksum = Column(String(64), nullable=True)  # SHA-256
+    sha256 = Column(String(64), nullable=True)
+    ingestion_timestamp = Column(DateTime, default=get_utc_now)
+    parser_status = Column(String(50), default="SUCCESS")
+    trust_state = Column(String(50), default="UNKNOWN")
     metadata_json = Column(JSON, default=dict)
     created_at = Column(DateTime, default=get_utc_now)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
     
     system = relationship("System", back_populates="documents")
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
+
+class EvidenceItem(Base):
+    __tablename__ = "evidence_items"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    evidence_id = Column(String(100), index=True)
+    document_id = Column(String(36), ForeignKey("documents.id"), nullable=False, index=True)
+    locator = Column(String(255), nullable=True)
+    section = Column(String(255), nullable=True)
+    page = Column(Integer, nullable=True)
+    text = Column(Text, nullable=False)
+    evidence_type = Column(String(100), nullable=True)
+    status = Column(String(50), default="UNKNOWN")
+    source_version = Column(String(50), nullable=True)
+    effective_from = Column(DateTime, nullable=True)
+    effective_to = Column(DateTime, nullable=True)
+    confidence = Column(Float, default=1.0)
+    extracted_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now)
+
+    document = relationship("Document")
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
@@ -78,6 +119,74 @@ class DocumentChunk(Base):
     metadata_json = Column(JSON, default=dict)
     
     document = relationship("Document", back_populates="chunks")
+
+class Relationship(Base):
+    __tablename__ = "relationships"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    relationship_id = Column(String(100), unique=True, index=True, nullable=True)
+    source_entity_type = Column(String(100), nullable=False, index=True)
+    source_entity_id = Column(String(100), nullable=False, index=True)
+    relationship_type = Column(String(100), nullable=False)
+    target_entity_type = Column(String(100), nullable=False, index=True)
+    target_entity_id = Column(String(100), nullable=False, index=True)
+    source_document_id = Column(String(36), nullable=True)
+    evidence_id = Column(String(36), nullable=True)
+    confidence = Column(Float, default=1.0)
+    valid_from = Column(DateTime, nullable=True)
+    valid_to = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now)
+
+class Requirement(Base):
+    __tablename__ = "requirements"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    requirement_id = Column(String(50), nullable=False, index=True)  # e.g. URS-001
+    system_id = Column(String(50), nullable=False, index=True)
+    document_id = Column(String(50), nullable=True)
+    source_document_id = Column(String(36), nullable=True)
+    evidence_id = Column(String(36), nullable=True)
+    text = Column(Text, nullable=False)
+    type = Column(String(50), nullable=False)  # FUNCTIONAL, NON_FUNCTIONAL
+    source_page = Column(Integer, nullable=True)
+    source_section = Column(String(100), nullable=True)
+    risk_reference = Column(String(50), nullable=True)  # RSK-MES-001
+    verification_reference = Column(String(100), nullable=True)
+    status = Column(String(50), default="OPEN")  # VERIFIED, OPEN, NOT_PERFORMED
+    created_at = Column(DateTime, default=get_utc_now)
+
+class Risk(Base):
+    __tablename__ = "risks"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    system_id = Column(String(50), nullable=False, index=True)
+    finding_id = Column(String(36), nullable=True)
+    source_document_id = Column(String(36), nullable=True)
+    evidence_id = Column(String(36), nullable=True)
+    risk_level = Column(String(50), nullable=False)  # LOW, MEDIUM, HIGH, CRITICAL
+    impact_type = Column(String(100), nullable=False)  # GxP, Data Integrity, Security, Operational
+    likelihood = Column(String(50), nullable=False)  # Low, Medium, High
+    impact = Column(String(50), nullable=False)  # Low, Medium, High, Critical
+    score = Column(Integer, nullable=False)  # 1 to 25
+    rationale = Column(Text, nullable=False)
+    control_mapping = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now)
+
+class ReleaseGate(Base):
+    __tablename__ = "release_gates"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    system_id = Column(String(50), nullable=False, index=True)
+    source_document_id = Column(String(36), nullable=True)
+    evidence_id = Column(String(36), nullable=True)
+    gate_code = Column(String(20), nullable=False, index=True)  # G1, G2, G3, G4, G5, G6
+    gate_name = Column(String(150), nullable=False)
+    status = Column(String(50), nullable=False)  # MET, NOT_MET, PENDING, BLOCKED
+    evidence_doc = Column(String(100), nullable=True)
+    evidence_section = Column(String(100), nullable=True)
+    blocking_reason = Column(Text, nullable=True)
+    prerequisites = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now)
 
 class ComplianceCheck(Base):
     __tablename__ = "compliance_checks"
@@ -100,6 +209,8 @@ class ComplianceFinding(Base):
     id = Column(String(36), primary_key=True, default=generate_uuid)
     system_id = Column(String(50), nullable=False, index=True)
     document_id = Column(String(36), nullable=True)
+    source_document_id = Column(String(36), nullable=True)
+    evidence_id = Column(String(36), nullable=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
     severity = Column(String(50), nullable=False)  # CRITICAL, HIGH, MEDIUM, LOW
@@ -109,21 +220,6 @@ class ComplianceFinding(Base):
     recommended_action = Column(Text, nullable=True)
     created_at = Column(DateTime, default=get_utc_now)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
-
-class Risk(Base):
-    __tablename__ = "risks"
-    
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    system_id = Column(String(50), nullable=False, index=True)
-    finding_id = Column(String(36), nullable=True)
-    risk_level = Column(String(50), nullable=False)  # LOW, MEDIUM, HIGH, CRITICAL
-    impact_type = Column(String(100), nullable=False)  # GxP, Data Integrity, Security, Operational
-    likelihood = Column(String(50), nullable=False)  # Low, Medium, High
-    impact = Column(String(50), nullable=False)  # Low, Medium, High, Critical
-    score = Column(Integer, nullable=False)  # 1 to 25
-    rationale = Column(Text, nullable=False)
-    control_mapping = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=get_utc_now)
 
 class Recommendation(Base):
     __tablename__ = "recommendations"
@@ -173,54 +269,9 @@ class Workflow(Base):
     payload_json = Column(JSON, default=dict)  # Contains details like snow_task_id, target action
     created_at = Column(DateTime, default=get_utc_now)
 
-class Requirement(Base):
-    __tablename__ = "requirements"
-    
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    requirement_id = Column(String(50), nullable=False, index=True)  # e.g. URS-001
-    system_id = Column(String(50), nullable=False, index=True)
-    document_id = Column(String(50), nullable=True)
-    text = Column(Text, nullable=False)
-    type = Column(String(50), nullable=False)  # FUNCTIONAL, NON_FUNCTIONAL
-    source_page = Column(Integer, nullable=True)
-    source_section = Column(String(100), nullable=True)
-    risk_reference = Column(String(50), nullable=True)  # RSK-MES-001
-    verification_reference = Column(String(100), nullable=True)
-    status = Column(String(50), default="OPEN")  # VERIFIED, OPEN, NOT_PERFORMED
-    created_at = Column(DateTime, default=get_utc_now)
-
-class TraceabilityLink(Base):
-    __tablename__ = "traceability_links"
-    
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    system_id = Column(String(50), nullable=False, index=True)
-    requirement_id = Column(String(50), nullable=False, index=True)
-    fs_id = Column(String(50), nullable=True)
-    risk_id = Column(String(50), nullable=True)
-    test_id = Column(String(50), nullable=True)
-    test_status = Column(String(50), default="NOT_PERFORMED")  # COMPLETE, NOT_PERFORMED, OPEN
-    implementation_status = Column(String(50), default="NOT_MET")
-    created_at = Column(DateTime, default=get_utc_now)
-
-class ReleaseGate(Base):
-    __tablename__ = "release_gates"
-    
-    id = Column(String(36), primary_key=True, default=generate_uuid)
-    system_id = Column(String(50), nullable=False, index=True)
-    gate_code = Column(String(20), nullable=False, index=True)  # G1, G2, G3, G4, G5, G6
-    gate_name = Column(String(150), nullable=False)
-    status = Column(String(50), nullable=False)  # MET, NOT_MET, PENDING, BLOCKED
-    evidence_doc = Column(String(100), nullable=True)
-    evidence_section = Column(String(100), nullable=True)
-    blocking_reason = Column(Text, nullable=True)
-    prerequisites = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=get_utc_now)
-
 class AuditLog(Base):
     """
     Tamper-Evident Append-Only Audit Trail.
-    Never exposes DELETE or UPDATE.
-    Hash Chaining: event_hash = SHA256(previous_hash + canonical_event_json)
     """
     __tablename__ = "audit_logs"
     
@@ -242,7 +293,6 @@ GENESIS_HASH = "0000000000000000000000000000000000000000000000000000000000000000
 
 def format_canonical_ts(dt) -> str:
     if isinstance(dt, str):
-        # Truncate any subsecond or timezone differences
         return dt[:19].replace(" ", "T")
     return dt.strftime("%Y-%m-%dT%H:%M:%S")
 
@@ -258,10 +308,6 @@ def create_audit_log(
     agent_name: str = None,
     request_id: str = None
 ) -> AuditLog:
-    """
-    Appends a new record to the tamper-evident Audit Trail.
-    Calculates: event_hash = SHA256(previous_hash + canonical_event_json)
-    """
     last_log = db.query(AuditLog).order_by(AuditLog.timestamp.desc(), AuditLog.id.desc()).first()
     previous_hash = last_log.event_hash if last_log else GENESIS_HASH
     
@@ -303,10 +349,6 @@ def create_audit_log(
     return audit_entry
 
 def verify_audit_chain(db):
-    """
-    Verifies the cryptographic integrity of the entire audit chain.
-    Returns: (is_valid, records_checked, message)
-    """
     logs = db.query(AuditLog).order_by(AuditLog.timestamp.asc(), AuditLog.id.asc()).all()
     if not logs:
         return True, 0, "Audit log is empty. Genesis state intact."
@@ -338,31 +380,26 @@ def verify_audit_chain(db):
         
     return True, len(logs), "All audit trail records cryptographically verified."
 
-
 class AuditChecklist(Base):
     __tablename__ = "audit_checklists"
-
-    id = Column(String(50), primary_key=True)  # e.g., 'CKL-TOP25-CORE', 'CKL-PHASE-01'
+    id = Column(String(50), primary_key=True)
     title = Column(String(255), nullable=False)
     version = Column(String(50), default="2026.1")
     source_file = Column(String(255), default="Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx")
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=get_utc_now)
-
     questions = relationship("AuditQuestion", back_populates="checklist", cascade="all, delete-orphan")
-
 
 class AuditQuestion(Base):
     __tablename__ = "audit_questions"
-
-    id = Column(String(50), primary_key=True)  # e.g. 'DA-01-001' or 'CORE-01'
+    id = Column(String(50), primary_key=True)
     checklist_id = Column(String(50), ForeignKey("audit_checklists.id"), nullable=False, index=True)
     sequence = Column(Integer, nullable=False)
     phase_no = Column(String(20), nullable=True)
     lifecycle_phase = Column(String(100), nullable=True)
     audit_domain = Column(String(100), nullable=True)
     control_topic = Column(String(150), nullable=True)
-    priority = Column(String(50), default="Critical")  # Critical, High, Medium, Low
+    priority = Column(String(50), default="Critical")
     audit_question = Column(Text, nullable=False)
     follow_up_probe = Column(Text, nullable=True)
     audit_rationale = Column(Text, nullable=True)
@@ -375,13 +412,10 @@ class AuditQuestion(Base):
     sheet_name = Column(String(100), nullable=True)
     row_number = Column(Integer, nullable=True)
     weight = Column(Integer, default=10)
-
     checklist = relationship("AuditChecklist", back_populates="questions")
-
 
 class AuditAssessment(Base):
     __tablename__ = "audit_assessments"
-
     id = Column(String(36), primary_key=True, default=generate_uuid)
     system_id = Column(String(50), nullable=False, index=True)
     checklist_id = Column(String(50), nullable=False, index=True)
@@ -401,25 +435,20 @@ class AuditAssessment(Base):
     findings_json = Column(JSON, default=list)
     lifecycle_gaps_json = Column(JSON, default=list)
     status = Column(String(50), default="COMPLETED")
-
     evidences = relationship("AuditEvidence", back_populates="assessment", cascade="all, delete-orphan")
-
 
 class AuditEvidence(Base):
     __tablename__ = "audit_evidences"
-
     id = Column(String(36), primary_key=True, default=generate_uuid)
     assessment_id = Column(String(36), ForeignKey("audit_assessments.id"), nullable=False, index=True)
     question_id = Column(String(50), nullable=False, index=True)
     system_id = Column(String(50), nullable=False, index=True)
-    status = Column(String(50), nullable=False)  # PASS, PARTIAL, FAIL, NOT_EVIDENCED, NOT_APPLICABLE
+    status = Column(String(50), nullable=False)
     evidence_text = Column(Text, nullable=True)
-    evidence_quality = Column(String(50), default="Found")  # Found, Partial, Missing, Conflicting
+    evidence_quality = Column(String(50), default="Found")
     confidence = Column(Float, default=0.9)
     citations_json = Column(JSON, default=list)
     gap_description = Column(Text, nullable=True)
-    risk_level = Column(String(50), default="LOW")  # CRITICAL, HIGH, MEDIUM, LOW
+    risk_level = Column(String(50), default="LOW")
     recommendation = Column(Text, nullable=True)
-
     assessment = relationship("AuditAssessment", back_populates="evidences")
-

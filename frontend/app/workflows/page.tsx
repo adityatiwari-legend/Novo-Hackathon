@@ -25,7 +25,7 @@ export default function WorkflowsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const res = await api.getAllWorkflows('SYS-LIMS-001');
+      const res = await api.getAllWorkflows('SYS-MES-001');
       setWorkflows(res);
     } catch (err) {
       console.error(err);
@@ -128,7 +128,7 @@ export default function WorkflowsPage() {
                       </span>
                       <h3 className="text-sm font-bold text-slate-900">{recTitle}</h3>
                     </div>
-                    <span className="text-xs font-mono text-slate-400">Target: SYS-LIMS-001</span>
+                    <span className="text-xs font-mono text-slate-400">Target: SYS-MES-001</span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -258,7 +258,7 @@ export default function WorkflowsPage() {
 
             <div className="text-xs text-slate-600 space-y-2">
               <p><b>Target Action:</b> {selectedWf.payload_json?.recommendation_title || 'Route URS for formal QA sign-off'}</p>
-              <p><b>Target System:</b> SYS-LIMS-001 (Validated LIMS)</p>
+              <p><b>Target System:</b> SYS-MES-001 (Novo Life MES PAS-X)</p>
               <p><b>Authorizer:</b> Dr. Elena Rostova (qa@demo.local)</p>
             </div>
 

@@ -36,7 +36,7 @@ export default function DashboardPage() {
   const handleRunAssessment = async () => {
     setAssessing(true);
     try {
-      await api.assessCompliance('SYS-LIMS-001');
+      await api.assessCompliance('SYS-MES-001');
       await loadData();
     } catch (err) {
       console.error(err);
@@ -324,8 +324,8 @@ export default function DashboardPage() {
             <tbody className="divide-y divide-slate-100">
               <tr className="hover:bg-slate-50/80 transition-colors">
                 <td className="py-3 px-4">
-                  <div className="font-bold text-slate-900">System A: Validated LIMS</div>
-                  <div className="text-[10px] text-slate-400 font-mono">SYS-LIMS-001 (GAMP 5 Cat 4)</div>
+                  <div className="font-bold text-slate-900">Novo Life MES PAS-X</div>
+                  <div className="text-[10px] text-slate-400 font-mono">SYS-MES-001 (GAMP 5 Cat 4)</div>
                 </td>
                 <td className="py-3 px-4">
                   <span className="bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded text-[10px]">

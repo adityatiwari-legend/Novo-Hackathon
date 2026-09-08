@@ -1,0 +1,74 @@
+
+Agenda
+Goal: Discuss the hackathon use case: Agentic AI for Always-On, Audit-Ready GxP IT System Management
+
+
+- [ ] Review hackathon use case: Agentic AI for Always-On, Audit-Ready GxP IT System Management (15 min)
+- [ ] Set expectations and agree for our regular mentor connects (10 min)
+- [ ] Explore AI tools relevant to the project (15 min)
+- [ ] Discuss Pharma Audits and IT System Management processes (10 min)
+- [ ] Clarify success criteria for this hackathon event (10 min)
+Meeting notes
+System management roles 
+
+- Sandeep explained their role as System Manager, responsible for process analytical technology systems in pharmaceutical manufacturing and quality control laboratories.
+- Sandeep described how continuous quality measurements are performed to ensure medicines and manufacturing processes meet quality and design requirements.
+- Sandeep shared that the Process Analytical Technology System is being implemented at six manufacturing plants worldwide, starting with Denmark and US sites.
+- Siddharth described their background in IT service and system management, including expertise in computer system validation and compliance with regulatory guidelines.
+Hackathon planning 
+
+- Sandeep outlined the meeting agenda, including team member information verification, use case discussion, expectations for the hackathon, audit readiness, and plans for regular communication during the hackathon.
+- Sandeep reviewed the team member list from the hackathon team and asked participants to verify and update their information if needed.
+- Sandeep encouraged participants to reach out one-on-one via email or upcoming sessions if they have questions about the hackathon use case or related documents.
+- Sandeep stated they would share the hackathon use case document again and invited participants to ask questions for clarification.
+- Sandeep stated that computer science students will gain exposure to pharmaceutical system management processes and will be guided through each phase during regular sessions.
+Team information verification 
+
+- Shyam confirmed that the full form of TVA is "Time Variance Agent" and explained its relevance to their project statement.
+- Participants from multiple universities, including Amitha University (Bangalore and Madhya Pradesh campuses), M.S. Ramaya, and Manipal Academy (Bangalore campus), verified that their team information was correct and all members were present.
+Team attendance 
+
+- Sandeep noted that approximately three teams were missing or had not joined the call.
+System management process 
+
+- Sandeep described the end-to-end responsibilities of system managers, including vendor selection, risk assessment, regulatory evaluation, supplier assessment, and system implementation in manufacturing areas.
+- Sandeep explained the initial assessment steps for implementing a new system, such as gathering user requirements, budgeting, and evaluating risks and regulatory impacts.
+- Sandeep outlined the process of supplier assessment, including issuing RFPs or RFIs, evaluating suppliers based on business, risk, and technology criteria, and finalizing procurement before system design and development.
+- Sandeep detailed the subsequent phases after supplier selection, including system design, development, pilot implementation, and comprehensive testing activities.
+- Sandeep explained that each phase of system implementation and operation requires specific documentation, including change requests, implementation plans, testing records, maintenance logs, calibration reports, and stakeholder agreements.
+- Sandeep described the challenge of locating and retrieving historical documentation across the entire system lifecycle to answer regulatory or business queries efficiently.
+- Siddharth discussed the difficulties of managing and storing documentation, especially when transitioning from paper-based to digital solutions, and highlighted uncertainty about retention periods for different documents.
+- Siddharth emphasized the importance of following standard procedures and guidelines to ensure consistent medicine quality and traceability of operational activities.
+- Sandeep explained that agents can check document completeness, compliance with regulatory requirements, and retrieve information based on queries.
+Audit readiness and compliance 
+
+- Sandeep highlighted the importance of maintaining accurate and complete records to address regulatory investigations, such as patient complaints related to medicines produced years ago.
+- Sandeep explained the challenge of locating and retrieving specific historical documentation to demonstrate compliance during regulatory audits.
+- Sandeep described the need to conduct gap assessments and provide evidence to regulators that all manufacturing parameters were valid and processes followed correctly.
+- Sandeep described the importance of retrieving accurate, evidence-based, and time-variant documentation for audit scenarios, emphasizing that agents must provide information from the correct document version based on the requested timeframe.
+Hackathon data and resources 
+
+- Sandeep explained that participants will receive synthetic data sets and documents for use as knowledge sources in their agent solutions.
+- Sandeep described common challenges with AI solutions reading various data formats, such as images, tables in PDFs, and information in parentheses or footnotes.
+Hackathon tools and templates 
+
+- Sandeep confirmed that participants can use open source tools, as well as enterprise-level tools like ChatGPT, Copilot, and LangGraph, to build their agents.
+- Sandeep explained that participants are encouraged to explore and use any new or open source tools available in the market for their prototype, not just current trending options.
+- Sandeep clarified that participants will not receive credits for using external tools and should rely on freely available resources.
+- Sandeep clarified that participants are encouraged to use their creativity in selecting AI tools and design approaches, including both new and older models, depending on available credits.
+- Sandeep confirmed that participants can use UI design tools like Streamblade or Langgraph to build their solutions.
+Prototype development guidance 
+
+- Sandeep advised participants to build a simple prototype first and then iterate to add more features.
+Prototype deployment requirements 
+
+- Sandeep clarified that agents for the prototype should run locally on participants' machines, including during the final presentation.
+Prototype testing process 
+
+- Sandeep stated that the demo prototype will be tested with multiple scenarios, and participants will receive test scenarios to ensure proper responses and error-free operation.
+Document version handling 
+
+- Sandeep emphasized the importance of handling different date formats in documents from various regions, such as Denmark, India, and China, to select the correct document version.
+Presentation expectations 
+
+- Sandeep highlighted that the presentation should be simple, avoiding technical jargon, and should build trust with non-IT management audiences.

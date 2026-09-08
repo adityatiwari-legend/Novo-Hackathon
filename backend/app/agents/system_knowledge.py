@@ -7,13 +7,13 @@ class SystemKnowledgeAgent:
     def __init__(self):
         self.name = "system_knowledge_agent"
 
-    def run(self, db: Session, system_id: str = "SYS-LIMS-001") -> AgentResult:
+    def run(self, db: Session, system_id: str = "SYS-MES-001") -> AgentResult:
         system = db.query(System).filter(System.id == system_id).first()
         docs = db.query(Document).filter(Document.system_id == system_id).all()
         
         system_info = {
             "id": system.id if system else system_id,
-            "name": system.name if system else "Validated LIMS",
+            "name": system.name if system else "Novo Life MES PAS-X",
             "criticality": system.criticality if system else "GxP-Critical",
             "business_owner": system.business_owner if system else "Dr. Marcus Vance",
             "documents_count": len(docs)

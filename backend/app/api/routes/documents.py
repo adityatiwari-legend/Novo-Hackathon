@@ -19,8 +19,8 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
 
 class DraftSectionRequest(BaseModel):
     section_name: str = "6. QA Approval & Validation Sign-Off"
-    document_title: str = "System_A_URS.docx"
-    system_name: str = "System A: Validated LIMS"
+    document_title: str = "NL-MES-URS-001.docx"
+    system_name: str = "Novo Life MES PAS-X"
     finding_context: str = "QA approval missing from URS."
 
 class ExportDraftRequest(BaseModel):
@@ -31,7 +31,7 @@ class ExportDraftRequest(BaseModel):
 @router.post("/upload", response_model=DocumentResponse)
 async def upload_document(
     file: UploadFile = File(...),
-    system_id: str = Form("SYS-LIMS-001"),
+    system_id: str = Form("SYS-MES-001"),
     source_system: str = Form("Local Upload"),
     db: Session = Depends(get_db)
 ):

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
 from backend.app.models.entities import (
-    System, Document, ComplianceFinding, Risk, Recommendation, EvidencePack, Workflow, ReleaseGate
+    System, Document, ComplianceFinding, Risk, Recommendation, EvidencePack, Workflow, ReleaseGate, AuditAssessment
 )
 from backend.app.schemas.domain import DashboardOverview, SystemResponse
 from backend.app.services.compliance_engine import compliance_engine
@@ -16,26 +16,20 @@ router = APIRouter(tags=["Dashboard & Systems"])
 
 @router.get("/dashboard", response_model=DashboardOverview)
 def get_dashboard(system_id: Optional[str] = None, db: Session = Depends(get_db)):
+    canonical_system_id = "SYS-MES-001"
     if not system_id:
-        mes = db.query(System).filter(System.id == "SYS-MES-001").first()
-        if mes:
-            system_id = "SYS-MES-001"
-        else:
-            first_sys = db.query(System).first()
-            system_id = first_sys.id if first_sys else "SYS-MES-001"
+        system_id = canonical_system_id
 
     system = db.query(System).filter(System.id == system_id).first()
     if not system:
         system = System(
-            id="SYS-MES-001",
-            name="Novo Life MES PAS-X",
-            description="Fictional Werum PAS-X Manufacturing Execution System implementation. Pre-operational simulation.",
+            id=system_id,
+            name="Novo Life MES PAS-X" if system_id == "SYS-MES-001" else f"System {system_id}",
+            description="Fictional Werum PAS-X Manufacturing Execution System (MES) implementation for commercial packaging line execution (GAMP 5 Category 4 Configured Software). Currently in Pre-Operational / Not Activated state.",
             criticality="GxP-Critical",
             gxp_status="GxP",
-            business_owner="Sarah Jenkins",
-            lifecycle_status="PRE-OPERATIONAL / NOT ACTIVATED",
-            release_recommendation="HOLD / DEFER - DO NOT RELEASE",
-            readiness_score=48
+            business_owner="System Owner",
+            lifecycle_status="PRE-OPERATIONAL / NOT ACTIVATED"
         )
         db.add(system)
         db.commit()
@@ -46,8 +40,8 @@ def get_dashboard(system_id: Optional[str] = None, db: Session = Depends(get_db)
     readiness_score = eval_res["readiness_score"]
     gate_res = release_gate_engine.evaluate_release_gates(db, system_id)
     
-    release_rec = gate_res.get("overall_decision", "HOLD / DEFER - DO NOT RELEASE")
-    lifecycle_st = system.lifecycle_status or "PRE-OPERATIONAL / NOT ACTIVATED"
+    release_rec = gate_res.get("overall_decision", "HOLD")
+    lifecycle_st = gate_res.get("lifecycle_status", "PRE-OPERATIONAL / NOT ACTIVATED")
     
     open_findings = db.query(ComplianceFinding).filter(
         ComplianceFinding.system_id == system_id,
@@ -60,8 +54,6 @@ def get_dashboard(system_id: Optional[str] = None, db: Session = Depends(get_db)
         Risk.system_id == system_id,
         Risk.risk_level.in_(["HIGH", "CRITICAL"])
     ).count()
-    if high_critical_risks == 0 and "MES" in system_id.upper():
-        high_critical_risks = 25  # 25 High risks from baseline
         
     pending_approvals = db.query(Workflow).filter(
         Workflow.system_id == system_id,
@@ -81,27 +73,32 @@ def get_dashboard(system_id: Optional[str] = None, db: Session = Depends(get_db)
         
     if not findings and eval_res.get("findings"):
         for f in eval_res["findings"]:
-            sev = f.severity.upper() if f.severity else "MEDIUM"
+            sev = f.get("severity", "MEDIUM").upper() if f.get("severity") else "MEDIUM"
             findings_by_severity[sev] = findings_by_severity.get(sev, 0) + 1
 
-    readiness_trend = [
-        {"timestamp": "Day -4", "score": 15},
-        {"timestamp": "Day -3", "score": 20},
-        {"timestamp": "Day -2", "score": 25},
-        {"timestamp": "Day -1", "score": 27},
-        {"timestamp": "Current", "score": readiness_score}
-    ]
+    assessments = db.query(AuditAssessment).filter(
+        AuditAssessment.system_id == system_id
+    ).order_by(AuditAssessment.assessed_at.asc()).all()
+    
+    readiness_trend = []
+    for a in assessments:
+        readiness_trend.append({
+            "timestamp": a.assessed_at.strftime("%Y-%m-%d"),
+            "score": a.readiness_score
+        })
+    if not readiness_trend or readiness_trend[-1]["score"] != readiness_score:
+        readiness_trend.append({"timestamp": "Current", "score": readiness_score})
     
     # Systems overview
-    systems_all = db.query(System).all()
+    systems_all = db.query(System).filter(System.id == canonical_system_id).all()
     systems_summary = [
         {
             "id": s.id,
             "name": s.name,
             "criticality": s.criticality,
             "readiness_score": s.readiness_score if s.readiness_score is not None else readiness_score,
-            "release_recommendation": s.release_recommendation or release_rec,
-            "lifecycle_status": s.lifecycle_status or lifecycle_st,
+            "release_recommendation": release_rec,
+            "lifecycle_status": lifecycle_st,
             "gxp_status": s.gxp_status,
             "last_assessed": s.last_assessed_at.strftime("%Y-%m-%d") if s.last_assessed_at else "Today"
         }
@@ -138,7 +135,8 @@ def get_dashboard(system_id: Optional[str] = None, db: Session = Depends(get_db)
 
 @router.get("/systems", response_model=List[SystemResponse])
 def list_systems(db: Session = Depends(get_db)):
-    systems = db.query(System).all()
+    canonical_system_id = "SYS-MES-001"
+    systems = db.query(System).filter(System.id == canonical_system_id).all()
     res = []
     for s in systems:
         findings_count = db.query(ComplianceFinding).filter(ComplianceFinding.system_id == s.id).count()
@@ -149,7 +147,7 @@ def list_systems(db: Session = Depends(get_db)):
             criticality=s.criticality,
             gxp_status=s.gxp_status,
             business_owner=s.business_owner,
-            readiness_score=s.readiness_score or 48,
+            readiness_score=s.readiness_score if s.readiness_score is not None else 0,
             open_findings_count=findings_count,
             created_at=s.created_at
         ))
@@ -168,7 +166,7 @@ def get_system(system_id: str, db: Session = Depends(get_db)):
         criticality=s.criticality,
         gxp_status=s.gxp_status,
         business_owner=s.business_owner,
-        readiness_score=s.readiness_score or 48,
+        readiness_score=s.readiness_score if s.readiness_score is not None else 0,
         open_findings_count=findings_count,
         created_at=s.created_at
     )

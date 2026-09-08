@@ -201,57 +201,47 @@ class OpenRouterProvider(LLMProvider):
         }
 
     def _fallback_generate(self, prompt: str, system_prompt: Optional[str]) -> str:
-        """Deterministic GxP-grounded compliance response generator when offline."""
-        p_lower = prompt.lower()
-        if "audit ready" in p_lower or "readiness" in p_lower:
-            return (
-                "Audit Readiness Assessment for Novo Life MES PAS-X (SYS-MES-001):\n\n"
-                "- System Status: PRE-OPERATIONAL / NOT ACTIVATED [NL-MES-SLA-001 | Section 1.2]\n"
-                "- Current Release Recommendation: HOLD / DEFER - DO NOT RELEASE [NL-MES-ITPSE-001 | Section 5]\n"
-                "- Readiness Score: 48% (NOT AUDIT READY)\n"
-                "- Critical Blockers: Release gates G5 and G6 are NOT MET [NL-MES-IREP-001 | Section 4]. "
-                "Intended-use verification (OV/PfV/UAT) has not been performed, and residual risks are not rated."
-            )
-        elif "blocking release" in p_lower or "release blocked" in p_lower or "blocker" in p_lower:
-            return (
-                "Evidence-Backed Release Blockers for Novo Life MES PAS-X:\n\n"
-                "1. Gate G5 Not Met: Release readiness criteria incomplete [NL-MES-IREP-001 | Section 4.1].\n"
-                "2. Gate G6 Not Met: Operational handover and ownership transfer prerequisites incomplete [NL-MES-IREP-001 | Section 4.2].\n"
-                "3. Verification Open: Intended-use verification (OV/PfV/UAT) is NOT PERFORMED [NL-MES-IREP-001 | Section 3.2].\n"
-                "4. Residual Risk Open: 49 working high risks have not undergone authorized residual risk acceptance [NL-MES-ITRRA-001 | Section 3].\n"
-                "5. Validation Summary Report: VSR is DEFERRED [NL-MES-IREP-001 | Section 4.3]."
-            )
-        elif "g5" in p_lower:
-            return (
-                "Release Gate G5 (Release Readiness) Analysis:\n\n"
-                "Status: NOT MET [NL-MES-IREP-001 | Section 4.1]\n"
-                "Evidence: The IT Implementation Report records that G5 release readiness prerequisites "
-                "were not satisfied due to open verification activities (OV/PfV/UAT not performed) and "
-                "unrated residual risks in the requirement risk register."
-            )
-        elif "verification" in p_lower:
-            return (
-                "Verification Activities Status for Novo Life MES PAS-X:\n\n"
-                "- Integration Testing: COMPLETE [NL-MES-IREP-001 | Section 3.1]\n"
-                "- Installation Qualification (IQ): COMPLETE [NL-MES-IREP-001 | Section 3.1]\n"
-                "- Backup & Restore Verification: COMPLETE [NL-MES-IREP-001 | Section 3.1]\n"
-                "- Intended-Use Verification (OV / PfV / UAT): NOT PERFORMED [NL-MES-IREP-001 | Section 3.2]\n\n"
-                "Conclusion: Not all verification activities have been completed. Operational verification remains open."
-            )
-        elif "risk" in p_lower:
-            return (
-                "Active Risk Baseline for Novo Life MES PAS-X:\n\n"
-                "- Total System Risks: 26 (RSK-MES-001 through RSK-MES-026) [NL-MES-ITRA-001]\n"
-                "- Requirement Risks: 49 Working High, 1 Working Medium, 0 Working Low [NL-MES-ITRRA-001]\n"
-                "- Residual Risk Status: NOT RATED (residual risk acceptance open) [NL-MES-ITRRA-001 | Section 3]."
-            )
+        """Deterministic GxP-grounded compliance response generator when offline. Extractive only."""
+        
+        # Extract evidence chunks provided in the prompt
+        evidence_snippets = []
+        if "CONTEXT:" in prompt and "USER QUESTION:" in prompt:
+            context_block = prompt.split("CONTEXT:")[1].split("USER QUESTION:")[0].strip()
+            
+            # Extract chunks based on "--- SOURCE:"
+            if context_block:
+                chunks = context_block.split("--- SOURCE:")
+                for chunk in chunks:
+                    if not chunk.strip():
+                        continue
+                    evidence_snippets.append(chunk.strip())
+                    
+        fallback_ans = "### OFFLINE EVIDENCE SUMMARY\n\nAssessment: UNKNOWN / NOT ASSESSED\n\n"
+        fallback_ans += "The local model was unavailable. This is an extractive summary of the provided context.\n\n"
+        
+        fallback_ans += "#### Evidence\n"
+        if not evidence_snippets:
+            fallback_ans += "Unsupported / missing:\nNo evidence was found matching the query.\n\n"
         else:
-            return (
-                "Analysis grounded in Novo Life MES PAS-X lifecycle documentation package:\n"
-                "System is currently in PRE-OPERATIONAL state. All conclusions are derived directly from "
-                "NL-MES-MLGP-001, NL-MES-URS-001, NL-MES-FS-001, NL-MES-ITRA-001, NL-MES-ITRRA-001, "
-                "NL-MES-SUPA-001, NL-MES-OMSOP-001, NL-MES-SLA-001, NL-MES-ITPSE-001, and NL-MES-IREP-001."
-            )
+            for snip in evidence_snippets:
+                lines = snip.split("\n")
+                if lines:
+                    header = lines[0].replace("---", "").strip()
+                    content = "\n".join(lines[1:]).strip()
+                    if len(content) > 300:
+                        content = content[:300] + "..."
+                    fallback_ans += f"**[{header}]**\n> {content}\n\n"
+        
+        fallback_ans += "#### Findings\n"
+        fallback_ans += "Extracted from source evidence only. No business inference made.\n\n"
+        
+        fallback_ans += "#### Release Gates\n"
+        fallback_ans += "UNKNOWN / NOT ASSESSED (offline mode).\n\n"
+        
+        fallback_ans += "#### Uncertainty\n"
+        fallback_ans += "HIGH. This is a deterministic offline fallback; AI synthesis was not performed.\n"
+                    
+        return fallback_ans.strip()
 
 
 # Global singleton instance

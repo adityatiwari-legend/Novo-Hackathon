@@ -15,7 +15,7 @@ export default function RiskPage() {
   const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
 
   useEffect(() => {
-    api.getRisks('SYS-LIMS-001')
+    api.getRisks('SYS-MES-001')
       .then(res => {
         setRisks(res);
         if (res.length > 0) setSelectedRisk(res[0]);

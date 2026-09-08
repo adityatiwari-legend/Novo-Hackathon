@@ -12,7 +12,7 @@ import { System, Document, ComplianceFinding } from '@/lib/types';
 
 export default function SystemDetailPage() {
   const params = useParams();
-  const systemId = (params?.id as string) || 'SYS-LIMS-001';
+  const systemId = (params?.id as string) || 'SYS-MES-001';
 
   const [system, setSystem] = useState<System | null>(null);
   const [docs, setDocs] = useState<Document[]>([]);

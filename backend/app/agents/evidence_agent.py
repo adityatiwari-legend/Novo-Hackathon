@@ -99,10 +99,24 @@ class AuditEvidenceAgent:
         r_box.font.size = Pt(9.5)
         r_box.font.color.rgb = RGBColor(180, 20, 20)
         
+        blocked_gate_codes = [g.get("gate_code") for g in gates if g.get("status") in ["NOT_MET", "BLOCKED", "NOT MET"]] if gates else []
+        if readiness_score >= 90 and not blocked_gate_codes:
+            release_rec = "APPROVED FOR RELEASE"
+            reason_text = "All critical lifecycle phase gates are satisfied and readiness score meets required threshold."
+        else:
+            release_rec = "HOLD / DEFER - DO NOT RELEASE"
+            reasons = []
+            if blocked_gate_codes:
+                reasons.append(f"blocked lifecycle phase gates: {', '.join(blocked_gate_codes)}")
+            critical_findings = [f for f in findings if f.get("severity") == "CRITICAL"]
+            if critical_findings:
+                reasons.append(f"{len(critical_findings)} critical compliance findings")
+            reason_text = "due to " + ", and ".join(reasons) if reasons else "due to insufficient readiness score."
+
         meta = doc.add_paragraph(
             f"Target System: {system_name} ({system_id})\n"
             f"Lifecycle Status: PRE-OPERATIONAL / NOT ACTIVATED\n"
-            f"Current Release Recommendation: HOLD / DEFER - DO NOT RELEASE\n"
+            f"Current Release Recommendation: {release_rec}\n"
             f"Assessment Timestamp: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
             f"Audit Readiness Index: {readiness_score}%\n"
             "Framework Alignment: 21 CFR Part 11 | EU Annex 11 | GAMP 5 Category 4 | ALCOA+ | ICH Q9"
@@ -115,8 +129,7 @@ class AuditEvidenceAgent:
         doc.add_paragraph(
             f"This dossier provides automated, continuous verification of {system_name} against established "
             f"GxP regulatory compliance standards. The current deterministic audit readiness score is evaluated at {readiness_score}%. "
-            f"The primary recommendation is HOLD / DEFER - DO NOT RELEASE due to open intended-use verification (OV/PfV/UAT not performed), "
-            f"unrated residual risks in the requirement baseline, and blocked lifecycle phase gates G5 and G6."
+            f"The primary recommendation is {release_rec} {reason_text}"
         )
         
         # Phase Gates
@@ -207,7 +220,21 @@ class AuditEvidenceAgent:
 
         story.append(Paragraph("GxP IT SYSTEM AUDIT EVIDENCE DOSSIER", title_style))
         story.append(Paragraph(f"System: <b>{system_name} ({system_id})</b> | Status: <b>PRE-OPERATIONAL</b>", sub_style))
-        story.append(Paragraph(f"Release Decision: <b>HOLD / DEFER - DO NOT RELEASE</b> | Readiness: <b>{readiness_score}%</b>", sub_style))
+        blocked_gate_codes = [g.get("gate_code") for g in gates if g.get("status") in ["NOT_MET", "BLOCKED", "NOT MET"]] if gates else []
+        if readiness_score >= 90 and not blocked_gate_codes:
+            release_rec = "APPROVED FOR RELEASE"
+            reason_text = "All critical lifecycle phase gates are satisfied and readiness score meets required threshold."
+        else:
+            release_rec = "HOLD / DEFER - DO NOT RELEASE"
+            reasons = []
+            if blocked_gate_codes:
+                reasons.append(f"blocked lifecycle phase gates: {', '.join(blocked_gate_codes)}")
+            critical_findings = [f for f in findings if f.get("severity") == "CRITICAL"]
+            if critical_findings:
+                reasons.append(f"{len(critical_findings)} critical compliance findings")
+            reason_text = "due to " + ", and ".join(reasons) if reasons else "due to insufficient readiness score."
+
+        story.append(Paragraph(f"Release Decision: <b>{release_rec}</b> | Readiness: <b>{readiness_score}%</b>", sub_style))
         story.append(Spacer(1, 12))
 
         # Executive Summary
@@ -215,8 +242,7 @@ class AuditEvidenceAgent:
         story.append(Paragraph(
             f"This dossier summarizes the compliance evaluation of {system_name}. "
             f"Deterministic readiness index: <b>{readiness_score}%</b>. "
-            f"System release is currently <b>HELD / DEFERRED</b> due to incomplete intended-use verification (OV/PfV/UAT not performed), "
-            f"unrated residual risks across 49 working high requirements, and unsatisfied lifecycle gates G5 and G6.",
+            f"System release is currently <b>{release_rec}</b> {reason_text}",
             body_style
         ))
         story.append(Spacer(1, 10))

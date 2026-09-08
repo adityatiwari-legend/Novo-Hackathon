@@ -17,7 +17,7 @@ export default function EvidencePage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const res = await api.getEvidencePacks('SYS-LIMS-001');
+      const res = await api.getEvidencePacks('SYS-MES-001');
       setEvidencePacks(res);
     } catch (err) {
       console.error(err);
@@ -39,7 +39,7 @@ export default function EvidencePage() {
     setTimeout(() => setGenStep('Compiling ReportLab PDF and Word .docx evidence dossier...'), 2400);
 
     try {
-      await api.generateEvidencePack('SYS-LIMS-001');
+      await api.generateEvidencePack('SYS-MES-001');
       setGenStep('Writing tamper-evident audit event with SHA-256 hash chaining...');
       setTimeout(async () => {
         await loadData();

@@ -48,7 +48,7 @@ const MODE_PROMPTS: Record<ChatMode, string[]> = {
     "Show traceability for URS-009 and URS-028"
   ],
   'General Q&A': [
-    "Explain how MES PAS-X differs from LIMS benchmark",
+    "Explain how MES PAS-X handles audit trails",
     "What regulations apply to commercial packaging MES?"
   ]
 };
@@ -64,7 +64,7 @@ export default function ChatPage() {
         "I reason across:\n" +
         "• Primary Evidence: Novo Life MES PAS-X Lifecycle Package (NL-MES-*)\n" +
         "• Governance SOP: NN Master IT System Lifecycle SOP (HACK-IT-SOP-001)\n" +
-        "• Benchmark Reference: GxP LIMS Lifecycle Package (LIMS-LCP-001)\n" +
+        "• Benchmark Reference: GxP Lifecycle Package\n" +
         "• Executable Audit: Top 25 Difficult-Auditor Questions (2026 XLSX)\n\n" +
         "Try asking: 'Run the GxP audit on PAS-X.' or 'Why did question 7 fail?'"
       ),
@@ -150,7 +150,7 @@ export default function ChatPage() {
                 </span>
               </div>
               <p className="text-[11px] text-slate-500">
-                Reasoning across MES PAS-X (Primary), Master IT SOP, LIMS Benchmark & Top 25 Audit Checklist
+                Reasoning across MES PAS-X (Primary), Master IT SOP, & Top 25 Audit Checklist
               </p>
             </div>
           </div>

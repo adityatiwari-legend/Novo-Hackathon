@@ -1,372 +1,143 @@
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TypedDict
+from datetime import datetime
 from backend.app.core.config import settings
 from backend.app.services.vector_store import vector_store
 from backend.app.services.llm_provider import get_llm_provider
 from backend.app.schemas.domain import QueryResponse, SourceCitation
+from backend.app.core.database import SessionLocal
+from backend.app.services.temporal_service import get_applicable_evidence
+from backend.app.services.compliance_engine import compliance_engine
+import logging
+
+try:
+    from langgraph.graph import StateGraph, END
+except ImportError:
+    StateGraph = None
+    END = "__end__"
+
+logger = logging.getLogger(__name__)
+
+class RAGState(TypedDict):
+    query: str
+    system_id: str
+    mode: str
+    intent: str
+    target_date: Optional[datetime]
+    target_date_filter: Dict[str, Any]
+    retrieved_chunks: List[Dict[str, Any]]
+    evidence_score: float
+    sources: List[SourceCitation]
+    citations: List[str]
+    readiness_score: int
+    findings: List[Dict[str, Any]]
+    highest_risk: str
+    answer: str
+    confidence: float
+    warnings: List[str]
+    agent_execution: List[Dict[str, Any]]
 
 class RAGService:
     def __init__(self):
         self.vector_store = vector_store
+        self._build_graph()
 
+    def _build_graph(self):
+        if StateGraph is None:
+            self.graph = None
+            return
+        workflow = StateGraph(RAGState)
+        
+        workflow.add_node("supervisor", self._node_supervisor)
+        workflow.add_node("evidence", self._node_evidence)
+        workflow.add_node("assurance", self._node_assurance)
+        workflow.add_node("risk", self._node_risk)
+        workflow.add_node("response", self._node_response)
+        
+        workflow.set_entry_point("supervisor")
+        workflow.add_edge("supervisor", "evidence")
+        workflow.add_edge("evidence", "assurance")
+        workflow.add_edge("assurance", "risk")
+        workflow.add_edge("risk", "response")
+        workflow.add_edge("response", END)
+        
+        self.graph = workflow.compile()
+        
     def normalize_query(self, query: str) -> str:
         q = query.strip()
         q = re.sub(r'[^\w\s\?-]', ' ', q)
         return ' '.join(q.split())
+        
+    def _determine_intent(self, query: str) -> str:
+        lower_q = query.lower()
+        if any(w in lower_q for w in ["audit", "compliance", "finding", "risk", "gate"]):
+            return "GxP Audit"
+        if "missing" in lower_q or "gap" in lower_q:
+            return "Gap Analysis"
+        return "General Q&A"
+        
+    def _determine_scope(self, query: str, default_system: str) -> Dict[str, str]:
+        system_id = default_system
+        return {"system_id": system_id}
+        
+    def _determine_filters(self, query: str) -> Dict[str, Any]:
+        import dateutil.parser
+        
+        date_pattern = r'\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})\b'
+        matches = re.findall(date_pattern, query, re.IGNORECASE)
+        
+        if matches:
+            date_str = matches[0]
+            ambiguous = False
+            if re.match(r'^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$', date_str):
+                parts = re.split(r'[/-]', date_str)
+                p1, p2 = int(parts[0]), int(parts[1])
+                if p1 <= 12 and p2 <= 12 and p1 != p2:
+                    ambiguous = True
+                    
+            if ambiguous:
+                logger.warning(f"Ambiguous date detected: {date_str}")
+                return {
+                    "target_date_filter": {
+                        "original_value": date_str,
+                        "parsed_value": None,
+                        "format": "DD/MM/YYYY or MM/DD/YYYY",
+                        "ambiguous": True,
+                        "confidence": 0.5
+                    },
+                    "target_date": None
+                }
+            
+            try:
+                dt = dateutil.parser.parse(date_str)
+                return {
+                    "target_date_filter": {
+                        "original_value": date_str,
+                        "parsed_value": dt.isoformat(),
+                        "format": "resolved",
+                        "ambiguous": False,
+                        "confidence": 1.0
+                    },
+                    "target_date": dt
+                }
+            except Exception as e:
+                logger.warning(f"Date parsing failed for {date_str}: {e}")
+                
+        return {}
 
     def _call_llm_or_reason(self, query: str, context_chunks: List[Dict[str, Any]], mode: str = "General Q&A") -> Dict[str, Any]:
-        """
-        Executes grounded generation using OpenRouter / LLMProvider with GxP audit reasoning.
-        Enforces strict citation syntax [DocumentID | p.X | Section] and [Workbook | Sheet | Row X].
-        Falls back to deterministic GxP reasoning if offline.
-        """
         context_str = "\n\n".join([
             f"--- SOURCE: {c.get('document_title', 'Doc')} (ID: {c.get('document_id', 'DOC')}, Page {c.get('page_number', 1)}, Section: {c.get('section', 'General')}) ---\n{c['content']}"
             for c in context_chunks
         ])
 
-        q_lower = query.lower()
-
-        # =========================================================================
-        # 1. Natural Language Audit Commands & Reasoning
-        # =========================================================================
-
-        # Command A: "Why did question 7 fail?" / "What evidence supports question 7?"
-        if ("question 7" in q_lower or "q7" in q_lower or "question seven" in q_lower) and ("fail" in q_lower or "evidence" in q_lower or "why" in q_lower or "supports" in q_lower):
-            return {
-                "answer": (
-                    "ANSWER\n\n"
-                    "Assessment:\n"
-                    "FAIL\n\n"
-                    "Why:\n"
-                    "Intended-use verification (OV / PfV / UAT) on commercial packaging line executions was deferred and recorded "
-                    "as NOT PERFORMED prior to release evaluation. Consequently, Release Gate G5 (Release Readiness) is BLOCKED, "
-                    "and the Validation Summary Report (VSR) cannot be approved.\n\n"
-                    "Evidence:\n"
-                    "- NL-MES-IREP-001 — Page 2 — Section 3.2 Intended-Use Verification Gap\n"
-                    "- NL-MES-IREP-001 — Page 3 — Section 4.1 Gate G5 Status\n"
-                    "- HACK-IT-SOP-001 — Page 17 — Section 7.2 Verification Execution\n"
-                    "- Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx — 09 PQ UAT — Row 5\n\n"
-                    "Gap:\n"
-                    "Operational qualification testing under realistic packaging line conditions was not performed.\n\n"
-                    "Risk:\n"
-                    "CRITICAL\n\n"
-                    "Recommendation:\n"
-                    "Execute intended-use qualification test scripts on commercial packaging lines and route the Validation Summary "
-                    "Report for Quality Unit sign-off to satisfy Gate G5 prerequisites.\n\n"
-                    "Confidence:\n"
-                    "HIGH"
-                ),
-                "forced_confidence": 0.98,
-                "warnings": ["Critical validation gap: Intended-use operational verification is missing."]
-            }
-
-        # Command B: "Run the GxP audit on PAS-X" / "Run the top 25 audit checklist"
-        if ("run" in q_lower or "execute" in q_lower) and ("top 25" in q_lower or "audit checklist" in q_lower or "gxp audit" in q_lower):
-            return {
-                "answer": (
-                    "ANSWER\n\n"
-                    "Assessment:\n"
-                    "FAIL (HOLD / DEFER - DO NOT RELEASE)\n\n"
-                    "Why:\n"
-                    "Execution of the Top 25 Difficult-Auditor GxP IT Audit Checklist against Novo Life MES PAS-X (SYS-MES-001) "
-                    "yields an Overall Audit Readiness Score of 61.2%. While baseline technical infrastructure (IQ) and audit trail "
-                    "controls are established, release is blocked by critical verification gaps and unrated residual risks.\n\n"
-                    "Summary Breakdown:\n"
-                    "• Total Questions: 25\n"
-                    "• Passed: 15\n"
-                    "• Partial: 4\n"
-                    "• Failed: 6\n"
-                    "• Not Evidenced: 0\n"
-                    "• Critical Findings: 4 (Gate G5 blocked, OV not performed, residual risks unrated, VSR unapproved)\n"
-                    "• High Findings: 3 (Operator training incomplete, SLA pre-operational, URS signoff pending)\n\n"
-                    "Evidence:\n"
-                    "- NL-MES-IREP-001 — Page 2 — Section 3.2 Verification Gap\n"
-                    "- NL-MES-ITRRA-001 — Page 3 — Section 3 Residual Risk Evaluation\n"
-                    "- NL-MES-SLA-001 — Page 1 — Section 1 System Scope\n"
-                    "- HACK-IT-SOP-001 — Page 19 — Section 8.1 Release Gating\n"
-                    "- Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx — Top 25 Master — Row 2 to 351\n\n"
-                    "Gap:\n"
-                    "Intended-use qualification open; 49 working high risks unrated; 0 of 250 packaging operators trained.\n\n"
-                    "Risk:\n"
-                    "CRITICAL\n\n"
-                    "Recommendation:\n"
-                    "Complete intended-use qualification on the packaging line, conduct Quality Unit residual risk review, "
-                    "train packaging line operators, and approve the Validation Summary Report.\n\n"
-                    "Confidence:\n"
-                    "HIGH"
-                ),
-                "forced_confidence": 0.98,
-                "warnings": ["System readiness is 61.2% with critical blockers. Release is deferred."]
-            }
-
-        # Command C: "Which audit questions fail?"
-        if "which" in q_lower and "fail" in q_lower and ("audit" in q_lower or "question" in q_lower or "checklist" in q_lower):
-            return {
-                "answer": (
-                    "ANSWER\n\n"
-                    "Assessment:\n"
-                    "FAIL (6 Questions Failing)\n\n"
-                    "Why:\n"
-                    "The following 6 audit questions from the Top 25 Checklist failed against current MES PAS-X evidence:\n\n"
-                    "1. [DA-03-005] Authorized Residual Risk Acceptance [CRITICAL]\n"
-                    "   - Gap: 49 working high requirements have unrated, unapproved residual risks.\n"
-                    "   - Evidence: [NL-MES-ITRRA-001 | p.3 | Section 3]\n\n"
-                    "2. [DA-09-001] Intended-Use Qualification (OV / PfV / UAT) [CRITICAL]\n"
-                    "   - Gap: Operational shopfloor verification was deferred and NOT PERFORMED.\n"
-                    "   - Evidence: [NL-MES-IREP-001 | p.2 | Section 3.2]\n\n"
-                    "3. [DA-10-001] Operational Handover & SLA Activation [HIGH]\n"
-                    "   - Gap: NL-MES-SLA-001 is in PRE-OPERATIONAL / NOT ACTIVATED status; Gate G6 open.\n"
-                    "   - Evidence: [NL-MES-SLA-001 | p.1 | Section 1]\n\n"
-                    "4. [DA-10-005] End-User Training Records [HIGH]\n"
-                    "   - Gap: 0 of 250 shopfloor packaging operators have completed qualified training.\n"
-                    "   - Evidence: [NL-MES-SLA-001 | p.2 | Appendix A]\n\n"
-                    "5. [DA-10-007] Validation Summary Report & Release Gate G5 [CRITICAL]\n"
-                    "   - Gap: VSR is deferred; Gate G5 marked BLOCKED; Release is HOLD / DEFER.\n"
-                    "   - Evidence: [NL-MES-IREP-001 | p.4 | Section 4.3]\n\n"
-                    "6. [DA-10-025] Release Gate Checklist Reconciliation [CRITICAL]\n"
-                    "   - Gap: Gates G5 and G6 unsatisfied; prerequisites missing.\n"
-                    "   - Evidence: [NL-MES-IREP-001 | p.3 | Gate G1-G6 Summary]\n\n"
-                    "Confidence:\n"
-                    "HIGH"
-                ),
-                "forced_confidence": 0.97,
-                "warnings": []
-            }
-
-        # Command D: "Show questions where evidence is missing"
-        if ("evidence is missing" in q_lower or "missing evidence" in q_lower) and ("question" in q_lower or "show" in q_lower):
-            return {
-                "answer": (
-                    "ANSWER\n\n"
-                    "Assessment:\n"
-                    "EVIDENCE GAPS IDENTIFIED\n\n"
-                    "Why:\n"
-                    "Evidence is missing or uncompleted for the following checklist areas:\n"
-                    "• DA-09-001 (Intended-Use Verification): Evidence of operational qualification on shopfloor packaging line is missing [NL-MES-IREP-001 | p.2 | Section 3.2].\n"
-                    "• DA-03-005 (Residual Risk Acceptance): Evidence of Quality Unit signed residual risk acceptance is missing [NL-MES-ITRRA-001 | p.3 | Section 3].\n"
-                    "• DA-10-005 (Operator Training): Evidence of training completion for 250 packaging operators is missing [NL-MES-SLA-001 | p.2 | Appendix A].\n"
-                    "• DA-10-007 (VSR Authorization): Evidence of an authorized Validation Summary Report is missing [NL-MES-IREP-001 | p.4 | Section 4.3].\n"
-                    "• DA-02-001 (URS Formal Sign-off): Formal Quality Unit signature missing on URS-001 [NL-MES-URS-001 | p.2 | Approvals].\n\n"
-                    "Recommendation:\n"
-                    "Compile and approve missing evidence artifacts before requesting operational release authorization.\n\n"
-                    "Confidence:\n"
-                    "HIGH"
-                ),
-                "forced_confidence": 0.96,
-                "warnings": []
-            }
-
-        # Command E: "Compare PAS-X against the master lifecycle SOP" / "Is PAS-X lifecycle compliant..."
-        if "master" in q_lower and ("sop" in q_lower or "lifecycle" in q_lower) and ("compare" in q_lower or "compliant" in q_lower or "against" in q_lower or "deviation" in q_lower):
-            return {
-                "answer": (
-                    "ANSWER\n\n"
-                    "Assessment:\n"
-                    "POTENTIAL LIFECYCLE DEVIATION IDENTIFIED\n\n"
-                    "Why:\n"
-                    "Direct cross-document comparison of Novo Life MES PAS-X evidence against NN Master IT System Lifecycle SOP "
-                    "(HACK-IT-SOP-001) reveals critical deviations and governance gaps:\n\n"
-                    "1. Intended-Use Verification (OV / PfV / UAT):\n"
-                    "   - Expected: HACK-IT-SOP-001 Section 7.2 (p.17) mandates completed qualification testing by business users prior to Gate G5.\n"
-                    "   - Observed: NL-MES-IREP-001 Section 3.2 records intended-use verification as NOT PERFORMED.\n"
-                    "   - Finding: POTENTIAL LIFECYCLE DEVIATION [NL-MES-IREP-001 | p.2 | Section 3.2] vs [HACK-IT-SOP-001 | p.17 | Section 7.2].\n\n"
-                    "2. Authorized Residual Risk Evaluation:\n"
-                    "   - Expected: HACK-IT-SOP-001 Section 6.2 (p.12) requires explicit Quality Unit residual risk authorization.\n"
-                    "   - Observed: NL-MES-ITRRA-001 indicates residual risk is NOT RATED across 49 working high requirements.\n"
-                    "   - Finding: POTENTIAL LIFECYCLE DEVIATION [NL-MES-ITRRA-001 | p.3 | Section 3] vs [HACK-IT-SOP-001 | p.12 | Section 6.2].\n\n"
-                    "3. Handover & Operator Qualification:\n"
-                    "   - Expected: HACK-IT-SOP-001 Section 8.1 (p.19) requires active SLAs and fully qualified users prior to Gate G6.\n"
-                    "   - Observed: NL-MES-SLA-001 is PRE-OPERATIONAL; 0 of 250 packaging operators trained.\n"
-                    "   - Finding: POTENTIAL LIFECYCLE DEVIATION [NL-MES-SLA-001 | p.1 | Section 1] vs [HACK-IT-SOP-001 | p.19 | Section 8.1].\n\n"
-                    "Aligned Areas:\n"
-                    "- Installation Qualification (IQ) and Technical Integration: Evidence indicates alignment [NL-MES-IREP-001 | p.2 | Section 3.1] with [HACK-IT-SOP-001 | p.15 | Section 7.1].\n"
-                    "- Audit Trail & Part 11/Annex 11 Controls: Evidence indicates alignment [NL-MES-URS-001 | p.3 | URS-028] with [HACK-IT-SOP-001 | p.23 | Section 10].\n"
-                    "- Disaster Recovery Validation: Evidence indicates alignment [NL-MES-IREP-001 | p.2 | Section 3.1] with [HACK-IT-SOP-001 | p.24 | Section 10].\n\n"
-                    "Note: Benchmark LIMS documentation (LIMS-LCP-001) confirms standard industry practice requires completed UAT and QA residual risk approval prior to production handover.\n\n"
-                    "Confidence:\n"
-                    "HIGH"
-                ),
-                "forced_confidence": 0.97,
-                "warnings": ["Potential lifecycle deviations identified against Master IT SOP."]
-            }
-
-        # Command F: "What should we fix before release?" / "What controls are missing?" / "Which lifecycle requirements are not met?"
-        if ("fix" in q_lower or "missing" in q_lower or "requirements are not met" in q_lower or "unblock" in q_lower) and ("release" in q_lower or "control" in q_lower or "lifecycle" in q_lower or "gate" in q_lower):
-            return {
-                "answer": (
-                    "ANSWER\n\n"
-                    "Assessment:\n"
-                    "EVIDENCE-BACKED CORRECTIVE REMEDIATION PLAN\n\n"
-                    "Why:\n"
-                    "To resolve the current HOLD / DEFER recommendation and satisfy Release Gates G5 and G6, the following "
-                    "corrective actions must be completed:\n\n"
-                    "1. Execute Intended-Use Verification (OV / PfV / UAT):\n"
-                    "   - Action: Execute qualification test scripts on commercial packaging line.\n"
-                    "   - Justification: NL-MES-IREP-001 Section 3.2 records operational testing as NOT PERFORMED, directly blocking Gate G5.\n"
-                    "   - Citation: [NL-MES-IREP-001 | p.2 | Section 3.2]\n\n"
-                    "2. Conduct Authorized Residual Risk Acceptance Review:\n"
-                    "   - Action: Convene formal review with Quality Unit to evaluate and sign off on residual risks for 49 working high requirements.\n"
-                    "   - Justification: NL-MES-ITRRA-001 indicates residual risks are currently NOT RATED.\n"
-                    "   - Citation: [NL-MES-ITRRA-001 | p.3 | Section 3]\n\n"
-                    "3. Authorize Validation Summary Report (VSR):\n"
-                    "   - Action: Route completed qualification dossier for Quality Unit release sign-off.\n"
-                    "   - Justification: VSR is currently deferred pending operational testing.\n"
-                    "   - Citation: [NL-MES-IREP-001 | p.4 | Section 4.3]\n\n"
-                    "4. Complete Shopfloor Training & Activate Operational SLA:\n"
-                    "   - Action: Qualify 250 packaging line operators and activate 24/7 SLA operational support.\n"
-                    "   - Justification: NL-MES-SLA-001 is PRE-OPERATIONAL with 0 operators trained, blocking Gate G6.\n"
-                    "   - Citation: [NL-MES-SLA-001 | p.1 | Section 1]\n\n"
-                    "Confidence:\n"
-                    "HIGH"
-                ),
-                "forced_confidence": 0.96,
-                "warnings": []
-            }
-
-        # Command G: "Generate an audit evidence report"
-        if "generate" in q_lower and ("report" in q_lower or "evidence pack" in q_lower or "dossier" in q_lower):
-            return {
-                "answer": (
-                    "ANSWER\n\n"
-                    "Assessment:\n"
-                    "REPORT GENERATION INITIALIZED\n\n"
-                    "Why:\n"
-                    "A professional 14-section GxP IT Audit & Lifecycle Intelligence Report has been compiled synthesizing "
-                    "all Top 25 checklist results, Master SOP lifecycle deviations, and release blocker evidence.\n\n"
-                    "Report Details:\n"
-                    "• System: Novo Life MES PAS-X (SYS-MES-001)\n"
-                    "• Overall Readiness Score: 61.2% (HOLD / DEFER)\n"
-                    "• Included Sections: Executive Summary, System Assessed, Metadata, Documents Reviewed, Audit Checklist Table, "
-                    "Question-by-Question Results, Critical Findings, Risk Summary, Lifecycle Gaps, Control Gaps, Recommendations, "
-                    "Limitations & References.\n"
-                    "• Formats: PDF and DOCX available under data/evidence_packs/.\n\n"
-                    "Notice:\n"
-                    "This is a hackathon/training simulation and does not constitute a regulatory audit, validation decision, "
-                    "or production release authorization.\n\n"
-                    "Confidence:\n"
-                    "HIGH"
-                ),
-                "forced_confidence": 0.98,
-                "warnings": []
-            }
-
-        # =========================================================================
-        # 2. Existing MES PAS-X Deterministic Reasoners (Preserved)
-        # =========================================================================
-
-        # "What is the approval date?"
-        if "approval date" in q_lower or "date of approval" in q_lower or "approved date" in q_lower:
-            return {
-                "answer": (
-                    "The approval date could not be found in the indexed evidence. "
-                    "In the indexed URS documents (e.g. NL-MES-URS-001 / System_A_URS.docx Section 6), "
-                    "formal Quality Unit sign-off is recorded as unapproved or missing with date 'Not found'. "
-                    "[NL-MES-URS-001 | p.2 | Document Approvals]"
-                ),
-                "forced_confidence": 0.42,
-                "warnings": ["The approval date could not be found in the indexed evidence."]
-            }
-
-        # "Is the MES PAS-X system audit ready?"
-        if "audit ready" in q_lower or "audit readiness" in q_lower or "ready for audit" in q_lower:
-            if re.search(r'\bsystem\s+a\b', q_lower):
-                return {
-                    "answer": (
-                        "System A (Validated LIMS) is currently 82% audit ready with 3 active compliance gaps "
-                        "(1 High-Risk finding: Missing formal QA Approval in System_A_URS.docx, and 2 Medium-Risk findings). "
-                        "Human QA approval is required prior to operational qualification. [System_A_URS.docx | p.2 | Section 6]"
-                    ),
-                    "forced_confidence": 0.94,
-                    "warnings": []
-                }
-            return {
-                "answer": (
-                    "Audit Readiness Assessment for Novo Life MES PAS-X (SYS-MES-001):\n\n"
-                    "• Status: NOT AUDIT READY (Readiness Score: 48%)\n"
-                    "• Release Recommendation: HOLD / DEFER - DO NOT RELEASE [NL-MES-ITPSE-001 | p.1 | Overall conclusion]\n"
-                    "• Current System State: PRE-OPERATIONAL / NOT ACTIVATED [NL-MES-SLA-001 | p.1 | System Scope]\n\n"
-                    "Critical Blockers:\n"
-                    "1. Release Gate G5 (Release Readiness) is NOT MET [NL-MES-IREP-001 | p.3 | Section 4.1].\n"
-                    "2. Release Gate G6 (Operational Handover) is NOT MET [NL-MES-IREP-001 | p.4 | Section 4.2].\n"
-                    "3. Intended-use verification (OV/PfV/UAT) has NOT BEEN PERFORMED [NL-MES-IREP-001 | p.2 | Section 3.2].\n"
-                    "4. Residual risks for 49 working high requirements have NOT BEEN ACCEPTED [NL-MES-ITRRA-001 | p.3 | Residual Risk Evaluation]."
-                ),
-                "forced_confidence": 0.96,
-                "warnings": ["System is in a pre-operational hold state. Operational use is strictly prohibited."]
-            }
-
-        # "What is blocking release?"
-        if "blocking" in q_lower or "blocker" in q_lower or "release blocked" in q_lower:
-            return {
-                "answer": (
-                    "Evidence-Backed Release Blockers for Novo Life MES PAS-X (HOLD / DEFER - DO NOT RELEASE):\n\n"
-                    "1. Gate G5 Not Met: Release readiness criteria are unsatisfied [NL-MES-IREP-001 | p.3 | Section 4.1].\n"
-                    "2. Gate G6 Not Met: Ownership handover, operational SLA activation, and support training remain open [NL-MES-IREP-001 | p.4 | Section 4.2].\n"
-                    "3. Verification Open: Intended-use verification (OV / PfV / UAT) is recorded as NOT PERFORMED [NL-MES-IREP-001 | p.2 | Section 3.2].\n"
-                    "4. Residual Risk Status: Residual risk is NOT RATED across 49 working high risks; authorized risk acceptance is pending [NL-MES-ITRRA-001 | p.3 | Section 3].\n"
-                    "5. Validation Summary Report: VSR is DEFERRED pending completion of operational qualification [NL-MES-IREP-001 | p.4 | Section 4.3]."
-                ),
-                "forced_confidence": 0.95,
-                "warnings": []
-            }
-
-        # "Why is G5 not met?"
-        if "g5" in q_lower:
-            return {
-                "answer": (
-                    "Release Gate G5 (Release Readiness) is marked as NOT MET based on the IT Implementation Report [NL-MES-IREP-001 | p.3 | Section 4.1].\n\n"
-                    "Key Justifications:\n"
-                    "• Intended-use testing (OV/PfV/UAT) was deferred and not performed prior to release evaluation.\n"
-                    "• The requirement risk assessment contains 49 working high risks with unrated residual risk.\n"
-                    "• The Validation Summary Report (VSR) has not received Quality Unit authorization.\n"
-                    "Conclusion: Under GAMP 5 and corporate lifecycle procedures, Gate G5 cannot pass without formal verification and residual risk sign-off."
-                ),
-                "forced_confidence": 0.95,
-                "warnings": []
-            }
-
-        # "Have all verification activities been completed?"
-        if "verification" in q_lower and ("completed" in q_lower or "finished" in q_lower or "all" in q_lower or "activities" in q_lower):
-            return {
-                "answer": (
-                    "No, not all verification activities have been completed for Novo Life MES PAS-X [NL-MES-IREP-001 | p.2 | Section 3.2].\n\n"
-                    "Verification Breakdown:\n"
-                    "- [PASS] Technical Integration Verification: COMPLETE [NL-MES-IREP-001 | p.2 | Section 3.1]\n"
-                    "- [PASS] Installation Qualification (IQ): COMPLETE [NL-MES-IREP-001 | p.2 | Section 3.1]\n"
-                    "- [PASS] Backup & Disaster Recovery Verification: COMPLETE [NL-MES-IREP-001 | p.2 | Section 3.1]\n"
-                    "- [OPEN / NOT PERFORMED] Intended-Use Verification (OV / PfV / UAT): NOT PERFORMED [NL-MES-IREP-001 | p.2 | Section 3.2]\n\n"
-                    "Operating without completed operational verification blocks system release and invalidates qualification."
-                ),
-                "forced_confidence": 0.96,
-                "warnings": ["Intended-use verification (OV/PfV/UAT) is missing."]
-            }
-
-        # "What risks remain open?"
-        if "risk" in q_lower and ("open" in q_lower or "remain" in q_lower or "baseline" in q_lower):
-            return {
-                "answer": (
-                    "Risk Baseline Evaluation for Novo Life MES PAS-X:\n\n"
-                    "• System Risk Register: 26 baseline risks identified (RSK-MES-001 through RSK-MES-026) [NL-MES-ITRA-001 | p.2 | Risk Register]\n"
-                    "• Requirement Risk Breakdown (50 URS requirements): [NL-MES-ITRRA-001 | p.1 | Executive Summary]\n"
-                    "  - Working High: 49 requirements\n"
-                    "  - Working Medium: 1 requirement (URS-028: Audit Trail Display)\n"
-                    "  - Working Low: 0 requirements\n"
-                    "• Residual Risk State: NOT RATED. Residual risk has not been formally accepted by the Quality Unit [NL-MES-ITRRA-001 | p.3 | Section 3]."
-                ),
-                "forced_confidence": 0.95,
-                "warnings": []
-            }
-
-        # Context empty fallback
         if not context_chunks:
             return {
-                "answer": "The requested information could not be found in the indexed evidence. No relevant document chunks matched the query.",
+                "answer": "UNKNOWN / NOT EVIDENCED: The requested information could not be found in the indexed evidence. No relevant document chunks matched the query and target date.",
                 "forced_confidence": 0.30,
                 "warnings": ["No matching document chunks found in vector index."]
             }
 
-        # Live OpenRouter LLM reasoning if configured
         provider = get_llm_provider()
         health = provider.health_check()
         if health.get("status") == "Healthy" and health.get("has_api_key"):
@@ -376,8 +147,7 @@ class RAGService:
                     "Answer the user's question STRICTLY based on the provided GxP document context below.\n\n"
                     "REGULATORY REASONING RULES:\n"
                     "1. Never hallucinate facts, dates, versions, or approval statuses. If not evidenced, state: 'Not evidenced in the supplied documents.'\n"
-                    "2. Distinguish Primary System Evidence (MES PAS-X, NL-MES-*) from Benchmark Reference (LIMS-LCP-001) and Governance SOP (HACK-IT-SOP-001).\n"
-                    "   Never attribute LIMS evidence to MES PAS-X.\n"
+                    "2. All evidence must refer to Novo Life MES PAS-X (NL-MES-*) and Governance SOP (HACK-IT-SOP-001).\n"
                     "3. Cite every factual assertion:\n"
                     "   - PDF: [DocumentID | p.Page | Section]\n"
                     "   - Excel: [Workbook | Sheet | Row X]\n"
@@ -386,7 +156,7 @@ class RAGService:
                     "5. When answering audit questions, follow this exact structure:\n"
                     "   ANSWER\n\n"
                     "   Assessment:\n"
-                    "   [PASS / PARTIAL / FAIL / NOT EVIDENCED]\n\n"
+                    "   [PASS / PARTIAL / FAIL / NOT EVIDENCED / HOLD / DEFER]\n\n"
                     "   Why:\n"
                     "   ...\n\n"
                     "   Evidence:\n"
@@ -399,7 +169,8 @@ class RAGService:
                     "   ...\n\n"
                     "   Confidence:\n"
                     "   [HIGH / MEDIUM / LOW]\n\n"
-                    "6. This is a hackathon/training simulation record and does not constitute a regulatory audit or validation decision."
+                    "6. This is a hackathon/training simulation record and does not constitute a regulatory audit or validation decision.\n"
+                    "7. DO NOT output internal reasoning blocks or <think> tags. Output only the final response."
                 )
                 user_prompt = f"CONTEXT:\n{context_str}\n\nUSER QUESTION: {query}\n\nProvide an evidence-backed audit answer:"
                 raw_ans = provider.generate(
@@ -409,64 +180,112 @@ class RAGService:
                     max_tokens=settings.AI_MAX_TOKENS
                 )
                 if raw_ans and len(raw_ans.strip()) > 20:
-                    return {"answer": raw_ans.strip(), "warnings": []}
+                    ans_clean = re.sub(r'<think>.*?</think>', '', raw_ans, flags=re.DOTALL).strip()
+                    ans_clean = re.sub(r'(?i)Here\'s a thinking process:.*?(?=ANSWER)', '', ans_clean, flags=re.DOTALL).strip()
+                    return {"answer": ans_clean, "warnings": []}
             except Exception as e:
-                logger.warning(f"OpenRouter LLM generation failed: {e}. Using deterministic chunk fallback.")
+                logger.warning(f"OpenRouter LLM generation failed: {e}. Using offline extractive fallback.")
 
-        top_chunk = context_chunks[0]
-        chunk_meta = top_chunk.get("metadata", {})
-        if "sheet" in chunk_meta and "row" in chunk_meta:
-            cite_formatted = f"[{chunk_meta.get('workbook', 'Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx')} | {chunk_meta['sheet']} | Row {chunk_meta['row']}]"
-        else:
-            cite_formatted = f"[{top_chunk.get('document_id', 'DOC')} | p.{top_chunk.get('page_number', 1)} | {top_chunk.get('section', 'General')}]"
-
+        # Offline fallback
+        summary_lines = [
+            "OFFLINE EVIDENCE SUMMARY\n",
+            "Assessment: UNKNOWN / NOT ASSESSED\n",
+            "The local model was unavailable, so this response only summarizes the entire retrieved evidence bundle.\n"
+        ]
+        
+        for idx, chunk in enumerate(context_chunks):
+            chunk_meta = chunk.get("metadata", {})
+            if "sheet" in chunk_meta and "row" in chunk_meta:
+                cite_formatted = f"[{chunk_meta.get('workbook', 'Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx')} | {chunk_meta['sheet']} | Row {chunk_meta['row']}]"
+            else:
+                cite_formatted = f"[{chunk.get('document_id', 'DOC')} | p.{chunk.get('page_number', 1)} | {chunk.get('section', 'General')}]"
+                
+            summary_lines.append(f"Evidence {idx + 1}: {cite_formatted}")
+            summary_lines.append(f"{chunk.get('content', '')[:450]}...\n")
+            
         return {
-            "answer": (
-                f"Based on evidence in {top_chunk.get('document_title', 'the documentation')} "
-                f"(ID: {top_chunk.get('document_id', 'DOC')}, Section: {top_chunk.get('section', 'General')}, Page {top_chunk.get('page_number', 1)}):\n\n"
-                f"{top_chunk['content'][:450]}...\n\n"
-                f"{cite_formatted}"
-            )
+            "answer": "\n".join(summary_lines)
         }
 
-    def query(self, question: str, system_id: str = "SYS-MES-001", top_k: int = 6, mode: str = "General Q&A") -> QueryResponse:
-        norm_q = self.normalize_query(question)
+    def _node_supervisor(self, state: RAGState) -> Dict[str, Any]:
+        intent = self._determine_intent(state["query"])
+        filters = self._determine_filters(state["query"])
         
-        # In GxP Audit mode, prioritize system evidence, Master SOP, and audit checklist
-        if mode == "GxP Audit":
-            retrieved_raw = self.vector_store.hybrid_search(norm_q, system_id=system_id, top_k=top_k)
-            # Include governance SOP and checklist chunks
-            extra_chunks = self.vector_store.hybrid_search(norm_q, system_id=None, top_k=4)
-            seen_ids = set([ch.get("id") for ch, _ in retrieved_raw])
-            for ch, sc in extra_chunks:
-                if ch.get("id") not in seen_ids:
-                    retrieved_raw.append((ch, sc * 0.95))
-                    seen_ids.add(ch.get("id"))
-            retrieved_raw.sort(key=lambda x: x[1], reverse=True)
-            retrieved_raw = retrieved_raw[:top_k]
-        else:
-            retrieved_raw = self.vector_store.hybrid_search(norm_q, system_id=system_id, top_k=top_k)
-            if not retrieved_raw and system_id:
-                retrieved_raw = self.vector_store.hybrid_search(norm_q, system_id=None, top_k=top_k)
+        target_date = filters.get("target_date")
+        target_date_filter = filters.get("target_date_filter", {})
+        
+        trace = state.get("agent_execution", []) + [{
+            "agent": "Supervisor Agent",
+            "step": f"Determined intent as '{intent}' and scoped query to system '{state['system_id']}'.",
+            "start": datetime.now().isoformat(),
+            "end": datetime.now().isoformat(),
+            "result": "Intent and filters extracted."
+        }]
+        
+        return {
+            "intent": intent,
+            "target_date": target_date,
+            "target_date_filter": target_date_filter,
+            "agent_execution": trace
+        }
 
+    def _node_evidence(self, state: RAGState) -> Dict[str, Any]:
+        system_id = state["system_id"]
+        target_date = state["target_date"]
+        query = state["query"]
+        
+        db = SessionLocal()
+        try:
+            valid_evidence_items = get_applicable_evidence(db, system_id, target_date)
+            valid_doc_ids = set()
+            for e in valid_evidence_items:
+                valid_doc_ids.add(e.document_id)
+                if getattr(e, "document", None) and getattr(e.document, "document_id", None):
+                    valid_doc_ids.add(e.document.document_id)
+        finally:
+            db.close()
+            
+        norm_q = self.normalize_query(query)
+        retrieved_raw = self.vector_store.hybrid_search(norm_q, system_id=system_id, top_k=20)
+        
+        filtered_chunks = []
+        for ch, score in retrieved_raw:
+            if ch.get("document_id") in valid_doc_ids:
+                filtered_chunks.append((ch, score))
+            if len(filtered_chunks) >= 6:
+                break
+                
+        # Expanded context for GxP Audit
+        if state.get("intent") == "GxP Audit" or state.get("mode") == "GxP Audit":
+            extra_chunks = self.vector_store.hybrid_search(norm_q, system_id=system_id, top_k=4)
+            seen_ids = set([ch.get("id") for ch, _ in filtered_chunks])
+            for ch, sc in extra_chunks:
+                if ch.get("document_id") not in valid_doc_ids:
+                    continue
+                if ch.get("id") not in seen_ids:
+                    filtered_chunks.append((ch, sc * 0.95))
+                    seen_ids.add(ch.get("id"))
+            filtered_chunks.sort(key=lambda x: x[1], reverse=True)
+            filtered_chunks = filtered_chunks[:6]
+            
         sources: List[SourceCitation] = []
         citations: List[str] = []
         retrieved_chunks: List[Dict[str, Any]] = []
         avg_score = 0.0
-
-        for ch, score in retrieved_raw:
+        
+        for ch, score in filtered_chunks:
             doc_name = ch.get("document_title") or "Document"
             doc_id = ch.get("document_id") or "DOC"
             page_num = ch.get("page_number")
             section_name = ch.get("section")
             snippet = ch.get("content", "")[:250].replace("\n", " ")
             chunk_meta = ch.get("metadata", {})
-
+            
             if "sheet" in chunk_meta and "row" in chunk_meta:
                 cite_str = f"[{chunk_meta.get('workbook', 'Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx')} | {chunk_meta['sheet']} | Row {chunk_meta['row']}]"
             else:
                 cite_str = f"[{doc_id} | p.{page_num or 1} | {section_name or 'General'}]"
-
+                
             if cite_str not in citations:
                 citations.append(cite_str)
                 sources.append(SourceCitation(
@@ -477,35 +296,172 @@ class RAGService:
                 ))
             retrieved_chunks.append(ch)
             avg_score += score
+            
+        if filtered_chunks:
+            avg_score = avg_score / len(filtered_chunks)
+            
+        trace = state.get("agent_execution", []) + [{
+            "agent": "Evidence Agent",
+            "step": f"Performed hybrid search with temporal filtering.",
+            "start": datetime.now().isoformat(),
+            "end": datetime.now().isoformat(),
+            "evidence_count": str(len(retrieved_chunks)),
+            "result": f"Retrieved {len(retrieved_chunks)} valid chunks. (Avg Score: {avg_score:.2f})"
+        }]
+        
+        return {
+            "retrieved_chunks": retrieved_chunks,
+            "evidence_score": avg_score,
+            "sources": sources,
+            "citations": citations,
+            "agent_execution": trace
+        }
 
-        if retrieved_raw:
-            avg_score = avg_score / len(retrieved_raw)
+    def _node_assurance(self, state: RAGState) -> Dict[str, Any]:
+        system_id = state["system_id"]
+        db = SessionLocal()
+        try:
+            comp_res = compliance_engine.evaluate_system(db, system_id)
+        finally:
+            db.close()
+            
+        trace = state.get("agent_execution", []) + [{
+            "agent": "Assurance Agent",
+            "step": "Evaluated configured rules against system state.",
+            "start": datetime.now().isoformat(),
+            "end": datetime.now().isoformat(),
+            "findings_count": str(len(comp_res.get("findings", []))),
+            "result": f"Computed readiness score: {comp_res.get('readiness_score', 0)}%"
+        }]
+        
+        return {
+            "readiness_score": comp_res.get("readiness_score", 0),
+            "findings": comp_res.get("findings", []),
+            "agent_execution": trace
+        }
 
-        # Generate grounded answer
-        reasoning_res = self._call_llm_or_reason(question, retrieved_chunks, mode=mode)
-        answer = reasoning_res["answer"]
-        warnings = reasoning_res.get("warnings", [])
+    def _node_risk(self, state: RAGState) -> Dict[str, Any]:
+        from backend.app.agents.risk_agent import risk_agent
+        system_id = state["system_id"]
+        findings = state.get("findings", [])
+        
+        db = SessionLocal()
+        try:
+            risk_res = risk_agent.run(db, findings, system_id)
+            highest_risk = risk_res.metadata.get("highest_risk_level", "LOW")
+        except Exception as e:
+            highest_risk = "UNKNOWN"
+            logger.warning(f"Risk evaluation failed: {e}")
+        finally:
+            db.close()
+            
+        trace = state.get("agent_execution", []) + [{
+            "agent": "Risk Agent",
+            "step": "Consumed findings to produce structured risk context.",
+            "start": datetime.now().isoformat(),
+            "end": datetime.now().isoformat(),
+            "result": f"Highest Risk: {highest_risk}"
+        }]
+        
+        return {
+            "highest_risk": highest_risk,
+            "agent_execution": trace
+        }
 
-        # Confidence calculation
+    def _node_response(self, state: RAGState) -> Dict[str, Any]:
+        retrieved_chunks = state.get("retrieved_chunks", [])
+        avg_score = state.get("evidence_score", 0.0)
+        
+        if not retrieved_chunks or avg_score < 0.40:
+            trace = state.get("agent_execution", []) + [{
+                "agent": "Response Composer / LLM",
+                "step": "Generated response based on missing evidence.",
+                "start": datetime.now().isoformat(),
+                "end": datetime.now().isoformat(),
+                "result": "Response formulated with low confidence."
+            }]
+            return {
+                "answer": "UNKNOWN / NOT EVIDENCED: The requested information could not be found in the indexed evidence. No relevant or applicable document chunks matched the query and target date.",
+                "confidence": 0.30,
+                "warnings": ["No matching document chunks found or evidence quality is too low."],
+                "agent_execution": trace
+            }
+            
+        reasoning_res = self._call_llm_or_reason(state["query"], retrieved_chunks, mode=state["intent"])
+        
         if "forced_confidence" in reasoning_res:
             confidence = reasoning_res["forced_confidence"]
         else:
-            if not retrieved_chunks:
-                confidence = 0.30
-            elif avg_score >= 0.70:
-                confidence = min(0.95, 0.75 + avg_score * 0.2)
-            elif avg_score >= 0.40:
-                confidence = 0.72
-            else:
-                confidence = 0.50
+            # Multi-factor confidence model
+            retrieval_relevance = min(1.0, avg_score * 1.1)
+            temporal_validity = 1.0 if state.get("target_date") else 0.9  # Penalize slightly if no temporal anchor
+            source_status = 1.0  # Trust controlled documents
+            claim_coverage = min(1.0, len(retrieved_chunks) * 0.25) # Max coverage at 4+ chunks
+            conflict_state = 1.0 # Assume deterministic extraction prevents conflict
+            
+            confidence = (
+                retrieval_relevance * 0.40 +
+                temporal_validity * 0.20 +
+                source_status * 0.20 +
+                claim_coverage * 0.10 +
+                conflict_state * 0.10
+            )
+            confidence = min(0.95, max(0.40, confidence))
+                
+        trace = state.get("agent_execution", []) + [{
+            "agent": "Response Composer / LLM",
+            "step": "Explained structured results and summarized evidence.",
+            "start": datetime.now().isoformat(),
+            "end": datetime.now().isoformat(),
+            "result": "Human-readable explanation formulated."
+        }]
+        
+        return {
+            "answer": reasoning_res["answer"],
+            "warnings": reasoning_res.get("warnings", []),
+            "confidence": confidence,
+            "agent_execution": trace
+        }
 
+    def query(self, question: str, system_id: str = "SYS-MES-001", top_k: int = 6, mode: str = "General Q&A") -> QueryResponse:
+        initial_state = {
+            "query": question,
+            "system_id": system_id,
+            "mode": mode,
+            "intent": "",
+            "target_date": None,
+            "target_date_filter": {},
+            "retrieved_chunks": [],
+            "evidence_score": 0.0,
+            "sources": [],
+            "citations": [],
+            "readiness_score": 0,
+            "findings": [],
+            "highest_risk": "",
+            "answer": "",
+            "confidence": 0.0,
+            "warnings": [],
+            "agent_execution": []
+        }
+        
+        if self.graph:
+            final_state = self.graph.invoke(initial_state)
+        else:
+            final_state = initial_state.copy()
+            final_state.update(self._node_supervisor(final_state))
+            final_state.update(self._node_evidence(final_state))
+            final_state.update(self._node_assurance(final_state))
+            final_state.update(self._node_risk(final_state))
+            final_state.update(self._node_response(final_state))
+            
         return QueryResponse(
             query=question,
-            answer=answer,
-            confidence=round(confidence, 2),
-            sources=sources,
-            citations=citations,
-            warnings=warnings
+            answer=final_state["answer"],
+            confidence=round(final_state["confidence"], 2),
+            sources=final_state["sources"],
+            citations=final_state["citations"],
+            warnings=final_state.get("warnings", []),
+            agent_execution=final_state["agent_execution"]
         )
 
 rag_service = RAGService()
