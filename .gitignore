@@ -40,4 +40,6 @@ yarn-error.log*
 *.zip
 backend/gxp_copilot.db
 data/evidence_packs/
+backups/
+backup/
 
