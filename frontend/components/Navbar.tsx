@@ -16,16 +16,27 @@ export const Navbar: React.FC<NavbarProps> = ({ onSimulationTriggered }) => {
   const [simulationActive, setSimulationActive] = useState(false);
   const [isTriggering, setIsTriggering] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [readinessScore, setReadinessScore] = useState<number | null>(null);
   const [aiStatus, setAiStatus] = useState<{ provider: string; status: string; model?: string }>({
     provider: 'OpenRouter',
     status: 'ACTIVE',
     model: 'claude-3.5-sonnet'
   });
 
+  const fetchReadiness = async () => {
+    try {
+      const data = await api.getReadiness();
+      setReadinessScore(data.readiness_score);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     api.getSimulationStatus()
       .then(res => setSimulationActive(res.simulation_active))
       .catch(() => {});
+    fetchReadiness();
 
     api.getAiHealth()
       .then(res => {
@@ -46,11 +57,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onSimulationTriggered }) => {
       if (simulationActive) {
         await api.resetSimulation();
         setSimulationActive(false);
-        setNotification('Telemetry reset: Baseline readiness restored to 82% (SYS-MES-001).');
+        const data = await api.getReadiness();
+        setReadinessScore(data.readiness_score);
+        setNotification(`Simulation reset: Baseline readiness restored to ${data.readiness_score}%.`);
       } else {
         const res = await api.triggerSimulation();
         setSimulationActive(true);
-        setNotification(res.notification || 'SOP Review Expired: Readiness dropped from 82% to 76% due to annual cycle expiration.');
+        const data = await api.getReadiness();
+        setReadinessScore(data.readiness_score);
+        setNotification(res.notification || `SOP Review Expired: Readiness dropped to ${data.readiness_score}%.`);
       }
       if (onSimulationTriggered) {
         onSimulationTriggered();
@@ -146,7 +161,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onSimulationTriggered }) => {
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isTriggering ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">
-              {simulationActive ? 'Reset Simulation (82%)' : 'Simulate Telemetry Event (82% → 76%)'}
+              {simulationActive 
+                ? `Reset Simulation${readinessScore !== null ? ` (${readinessScore}%)` : ''}` 
+                : `Simulate SOP Expiration${readinessScore !== null ? ` (${readinessScore}%)` : ''}`}
             </span>
             <span className="sm:hidden">
               {simulationActive ? 'Reset' : 'Simulate'}

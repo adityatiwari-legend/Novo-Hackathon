@@ -6,7 +6,7 @@ class RecommendationAgent:
     def __init__(self):
         self.name = "recommendation_agent"
 
-    def run(self, db: Session, findings: List[Dict[str, Any]], system_id: str = "SYS-LIMS-001") -> AgentResult:
+    def run(self, db: Session, findings: List[Dict[str, Any]], system_id: str = "SYS-MES-001") -> AgentResult:
         recommendations = []
         
         for f in findings:
@@ -20,7 +20,7 @@ class RecommendationAgent:
                     "suggested_owner": "Sarah Jenkins (Technical System Owner) & QA Validation Lead",
                     "due_date_suggestion": "Immediate (Within 5 Business Days)",
                     "rationale": (
-                        "Section 6 of System_A_URS.docx lacks Quality Assurance digital signature. "
+                        "Section 6 of NL-MES-URS-001.docx lacks Quality Assurance digital signature. "
                         "A formal approval workflow must be routed via ServiceNow / Veeva Vault Quality "
                         "before operational qualification (OQ) execution."
                     ),

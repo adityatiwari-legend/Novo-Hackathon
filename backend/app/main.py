@@ -18,6 +18,7 @@ from backend.app.api.routes.audit_log import router as audit_log_router
 from backend.app.api.routes.agents import router as agents_router
 from backend.app.api.routes.simulation import router as simulation_router
 from backend.app.api.routes.audit_checklist import router as audit_checklist_router
+from backend.app.api.routes.systems import router as systems_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -58,6 +59,7 @@ app.include_router(audit_log_router, prefix=settings.API_V1_STR)
 app.include_router(agents_router, prefix=settings.API_V1_STR)
 app.include_router(simulation_router, prefix=settings.API_V1_STR)
 app.include_router(audit_checklist_router, prefix=settings.API_V1_STR)
+app.include_router(systems_router, prefix=settings.API_V1_STR)
 
 from backend.app.services.llm_provider import get_llm_provider
 

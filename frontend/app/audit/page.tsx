@@ -469,7 +469,7 @@ export default function AuditPage() {
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 Direct evidence benchmark contrasting NN Master IT System Lifecycle SOP (HACK-IT-SOP-001)
-                against Novo Life MES PAS-X execution records and GxP LIMS reference.
+                against Novo Life MES PAS-X execution records.
               </p>
             </div>
 
@@ -554,11 +554,6 @@ export default function AuditPage() {
                     <p className="font-bold text-blue-900">
                       Recommended Action: <span className="font-normal text-slate-800">{item.recommended_action}</span>
                     </p>
-                    {item.lims_benchmark_ref && (
-                      <p className="text-[11px] text-slate-500 italic">
-                        Benchmark Note: {item.lims_benchmark_ref}
-                      </p>
-                    )}
                   </div>
                 </div>
               );

@@ -17,7 +17,7 @@ export default function EvidencePage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const res = await api.getEvidencePacks();
+      const res = await api.getEvidencePacks('SYS-MES-001');
       setEvidencePacks(res);
     } catch (err) {
       console.error(err);

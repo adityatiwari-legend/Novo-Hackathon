@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from backend.app.models.entities import (
     AuditChecklist, AuditQuestion, AuditAssessment, AuditEvidence,
     System, Document, DocumentChunk, ReleaseGate, Risk, ComplianceFinding,
-    create_audit_log
+    create_audit_log, EvidenceItem
 )
 from backend.app.schemas.domain import (
     AuditAssessmentResponse, AuditAssessmentItem, CrossDocComparisonItem,
@@ -34,18 +34,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Approved concept statement, process diagrams, preliminary GxP assessment with named owners.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.95,
-        "citations": [
-            "[NL-MES-MLGP-001 | p.1 | System Scope & Classification]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 01 Concept Business Case | Row 5]"
-        ],
-        "observed": "MES PAS-X intended use for commercial packaging execution is documented with GAMP Category 4 configured boundary.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Maintain boundary documentation during operational changes.",
-        "benchmark": "LIMS-LCP-001 p.3 establishes boundary expectations for laboratory execution."
+        "check_type": "DOCUMENT_APPROVED",
+        "rule_parameters": {"target_document_type": "System Scope"}
     },
     {
         "seq": 2,
@@ -56,18 +46,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Data criticality register, ALCOA+ assessment, data flow map, and technical controls.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.94,
-        "citations": [
-            "[NL-MES-URS-001 | p.2 | Section 2.1 Data Integrity Controls]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 01 Concept Business Case | Row 7]"
-        ],
-        "observed": "ALCOA+ controls, automated audit trailing, and secure database parameters are specified in URS.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Verify end-to-end encryption across third-party plant interfaces.",
-        "benchmark": "LIMS-LCP-001 p.4 items #5 and #6 require raw-data ALCOA+ mappings."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["ALCOA", "Data Lifecycle", "URS"]}
     },
     {
         "seq": 3,
@@ -78,19 +58,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Approved URS with unique IDs, testable criteria, and QA signoff.",
-        "eval_logic": "PARTIAL",
-        "quality": "Partial",
-        "confidence": 0.95,
-        "citations": [
-            "[NL-MES-URS-001 | p.1 | Executive Summary]",
-            "[NL-MES-ITRRA-001 | p.1 | Section 1]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 02 URS | Row 5]"
-        ],
-        "observed": "50 URS requirements are catalogued (URS-001 through URS-050), but formal Quality Unit signature on URS-001 is pending.",
-        "gap": "Evidence indicates Quality Unit approval signature remains pending on the baseline URS document.",
-        "severity": "HIGH",
-        "recommendation": "Route URS-001 through formal electronic Quality Unit sign-off.",
-        "benchmark": "Master SOP HACK-IT-SOP-001 Section 6.1 requires QA approval before detailed design."
+        "check_type": "DOCUMENT_APPROVED",
+        "rule_parameters": {"target_document_type": "URS"}
     },
     {
         "seq": 4,
@@ -101,18 +70,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "System risk assessment (ITRA), hazard statements, severity/probability/detectability scoring.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.96,
-        "citations": [
-            "[NL-MES-ITRA-001 | p.2 | Risk Register RSK-MES-001 to 026]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 03 Risk GAMP | Row 5]"
-        ],
-        "observed": "26 baseline system risks (RSK-MES-001 through RSK-MES-026) are identified and evaluated according to ICH Q9.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Review risk baseline annually during periodic system evaluation.",
-        "benchmark": "LIMS-LCP-001 p.4 requires initial ITRA before procurement."
+        "check_type": "DOCUMENT_APPROVED",
+        "rule_parameters": {"target_document_type": "Risk Assessment"}
     },
     {
         "seq": 5,
@@ -123,19 +82,7 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Formal residual risk assessment, signed risk acceptance matrix, QA Unit approval.",
-        "eval_logic": "FAIL",
-        "quality": "Missing",
-        "confidence": 0.97,
-        "citations": [
-            "[NL-MES-ITRRA-001 | p.3 | Section 3 Residual Risk Evaluation]",
-            "[HACK-IT-SOP-001 | p.12 | Section 6.2 Risk Scales and Acceptance]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 03 Risk GAMP | Row 9]"
-        ],
-        "observed": "NL-MES-ITRRA-001 indicates residual risk is NOT RATED across 49 working high requirements. No formal Quality Unit acceptance exists.",
-        "gap": "Residual risk evaluation is unrated and unapproved for 49 critical working requirements.",
-        "severity": "CRITICAL",
-        "recommendation": "Conduct an authorized residual risk review session with the Quality Unit to sign off on working high risks.",
-        "benchmark": "Master SOP HACK-IT-SOP-001 Section 6.2 mandates QA sign-off of residual risk prior to release."
+        "check_type": "RESIDUAL_RISK_ACCEPTED",
     },
     {
         "seq": 6,
@@ -146,18 +93,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "High",
         "weight": 10,
         "expected_evidence": "Supplier audit report, QA agreement, capability assessment, and escrow agreements.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.92,
-        "citations": [
-            "[NL-MES-SUPA-001 | p.1 | Werum Supplier Audit & Qualification]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 04 Supplier Qualification | Row 5]"
-        ],
-        "observed": "Werum PAS-X supplier assessment completed; certified ISO 9001/TickIT with formal Quality Agreement in place.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Monitor annual supplier performance reviews.",
-        "benchmark": "Master SOP Section 6.3 requires supplier audits every 3 years."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Supplier", "Werum", "SLA"]}
     },
     {
         "seq": 7,
@@ -168,18 +105,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Approved IQ protocol, execution logs, discrepancy logs, and signed summary report.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.96,
-        "citations": [
-            "[NL-MES-IREP-001 | p.2 | Section 3.1 Technical Verification Summary]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 07 IQ | Row 5]"
-        ],
-        "observed": "Installation Qualification (IQ) executed successfully with 0 open critical discrepancies; Oracle DB and cluster verified.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Maintain automated checksum drift monitoring on production config files.",
-        "benchmark": "LIMS-LCP-001 p.8 Item #15 confirms IQ protocol standards."
+        "check_type": "DOCUMENT_APPROVED",
+        "rule_parameters": {"target_document_type": "Implementation Report"}
     },
     {
         "seq": 8,
@@ -190,18 +117,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Approved OQ protocol, test execution records, security penetration test, and deviation logs.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.93,
-        "citations": [
-            "[NL-MES-IREP-001 | p.2 | Section 3.1 Technical Verification]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 08 OQ | Row 5]"
-        ],
-        "observed": "Core software functional testing executed by supplier and verified internally for technical interfaces.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Retain raw automated execution logs for audit inspection.",
-        "benchmark": "Master SOP HACK-IT-SOP-001 Section 7.2 requires verified OQ before PQ."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Implementation Report", "OQ", "Functional"]}
     },
     {
         "seq": 9,
@@ -212,20 +129,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 25,
         "expected_evidence": "Approved PQ/UAT protocols, executed shopfloor test runs, operator qualification, and signed VSR.",
-        "eval_logic": "FAIL",
-        "quality": "Missing",
-        "confidence": 0.98,
-        "citations": [
-            "[NL-MES-IREP-001 | p.2 | Section 3.2 Intended-Use Verification Gap]",
-            "[NL-MES-IREP-001 | p.3 | Section 4.1 Gate G5 Status]",
-            "[HACK-IT-SOP-001 | p.17 | Section 7.2 Verification Execution]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 09 PQ UAT | Row 5]"
-        ],
-        "observed": "NL-MES-IREP-001 Section 3.2 explicitly records: 'Intended-Use Verification (OV / PfV / UAT): NOT PERFORMED'. Release Gate G5 is BLOCKED.",
-        "gap": "Operational verification on commercial packaging lines was deferred and remains unperformed, directly invalidating release readiness.",
-        "severity": "CRITICAL",
-        "recommendation": "Execute intended-use qualification test scripts on the packaging line before seeking Gate G5 release authorization.",
-        "benchmark": "Master SOP HACK-IT-SOP-001 Section 7.2 and 21 CFR 211.68 mandate intended-use verification."
+        "check_type": "RELEASE_GATE_MET",
+        "rule_parameters": {"gate_code": "G5"}
     },
     {
         "seq": 10,
@@ -236,19 +141,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Approved SLA, support handover checklist, incident runbooks, and disaster escalation roster.",
-        "eval_logic": "FAIL",
-        "quality": "Missing",
-        "confidence": 0.97,
-        "citations": [
-            "[NL-MES-SLA-001 | p.1 | Section 1 System Operational Status]",
-            "[NL-MES-IREP-001 | p.4 | Section 4.2 Gate G6 Status]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 10 GoLive Handover | Row 5]"
-        ],
-        "observed": "NL-MES-SLA-001 is in 'PRE-OPERATIONAL / NOT ACTIVATED' status. Support tiers and 24/7 on-call rosters are not operational.",
-        "gap": "Support handover is not executed; Release Gate G6 is marked NOT MET.",
-        "severity": "HIGH",
-        "recommendation": "Activate IT service management SLA tiers and finalize operational support agreements.",
-        "benchmark": "Master SOP HACK-IT-SOP-001 Section 8.1 requires signed SLA prior to production go-live."
+        "check_type": "RELEASE_GATE_MET",
+        "rule_parameters": {"gate_code": "G6"}
     },
     {
         "seq": 11,
@@ -259,19 +153,7 @@ CORE_25_AUDIT_SPECS = [
         "priority": "High",
         "weight": 15,
         "expected_evidence": "LMS training records, curriculum matrix, competency assessments, and trainer qualifications.",
-        "eval_logic": "FAIL",
-        "quality": "Missing",
-        "confidence": 0.96,
-        "citations": [
-            "[NL-MES-SLA-001 | p.2 | Appendix A Training Matrix]",
-            "[NL-MES-IREP-001 | p.4 | Section 4.2]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 10 GoLive Handover | Row 9]"
-        ],
-        "observed": "Training records show 0 of 250 packaging operators have completed qualified MES user training.",
-        "gap": "Zero shopfloor packaging operators trained; system cannot be operated in compliance with GxP.",
-        "severity": "HIGH",
-        "recommendation": "Deliver classroom and simulator training to 250 operators prior to production line go-live.",
-        "benchmark": "Master SOP Section 8.1 and EU GMP Annex 11 Section 2 mandate trained operators."
+        "check_type": "TRAINING_COMPLETE",
     },
     {
         "seq": 12,
@@ -282,20 +164,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 25,
         "expected_evidence": "Signed VSR, gate G5 sign-off matrix, deviation summary, and unconditional/conditional release memo.",
-        "eval_logic": "FAIL",
-        "quality": "Missing",
-        "confidence": 0.98,
-        "citations": [
-            "[NL-MES-IREP-001 | p.4 | Section 4.3 Validation Summary Report]",
-            "[NL-MES-ITPSE-001 | p.1 | Overall Conclusion]",
-            "[HACK-IT-SOP-001 | p.19 | Section 8.1 Release Decision & Gate G5]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 10 GoLive Handover | Row 11]"
-        ],
-        "observed": "VSR is deferred and unapproved. Release Gate G5 is NOT MET. Release recommendation is HOLD / DEFER - DO NOT RELEASE.",
-        "gap": "Validation Summary Report is deferred; system cannot be authorized for commercial batch execution.",
-        "severity": "CRITICAL",
-        "recommendation": "Compile and route the VSR following operational verification completion.",
-        "benchmark": "Master SOP HACK-IT-SOP-001 Section 8.1 mandates QA-approved VSR for Gate G5."
+        "check_type": "RELEASE_GATE_MET",
+        "rule_parameters": {"gate_code": "G5"}
     },
     {
         "seq": 13,
@@ -306,18 +176,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Periodic evaluation report (ITPSE), frozen source data for incidents/changes/access, and QA signoff.",
-        "eval_logic": "PARTIAL",
-        "quality": "Partial",
-        "confidence": 0.94,
-        "citations": [
-            "[NL-MES-ITPSE-001 | p.1 | Periodic System Evaluation]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 11 Ops Periodic Review | Row 5]"
-        ],
-        "observed": "NL-MES-ITPSE-001 was conducted, but concluded system is PRE-OPERATIONAL and recommended HOLD / DEFER due to open validation gaps.",
-        "gap": "Evaluation confirmed system is NOT yet in a production validated state.",
-        "severity": "HIGH",
-        "recommendation": "Resolve pre-operational blockers before initiating operational periodic review cycles.",
-        "benchmark": "Master SOP Section 9 mandates periodic review every 24 months for GxP critical systems."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Periodic System Evaluation", "ITPSE"]}
     },
     {
         "seq": 14,
@@ -328,18 +188,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "DR test protocol, restore execution logs, checksum validation, and QA sign-off.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.95,
-        "citations": [
-            "[NL-MES-IREP-001 | p.2 | Section 3.1 Technical Verification]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 11 Ops Periodic Review | Row 9]"
-        ],
-        "observed": "Cold-start restore and automated daily snapshot verification succeeded; RTO < 4 hours and RPO < 15 minutes validated.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Schedule annual Disaster Recovery simulation drills.",
-        "benchmark": "Master SOP Section 10 requires annual DR restoration tests."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Disaster", "Backup", "Restore", "Implementation Report"]}
     },
     {
         "seq": 15,
@@ -350,18 +200,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Change control SOP, ServiceNow ticket extracts, git commit logs, deployment audit trails.",
-        "eval_logic": "PARTIAL",
-        "quality": "Partial",
-        "confidence": 0.91,
-        "citations": [
-            "[NL-MES-MLGP-001 | p.2 | Change Management Section]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 12 Change Config Mgmt | Row 5]"
-        ],
-        "observed": "Change procedure defined, but production change ledger is frozen pending pre-operational release authorization.",
-        "gap": "Production configuration baseline is unreleased.",
-        "severity": "MEDIUM",
-        "recommendation": "Freeze and checksum the v1.0 release branch upon VSR completion.",
-        "benchmark": "Master SOP Section 8.2 requires baseline configuration freezing before Gate G5."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Lifecycle Governance", "Change Management"]}
     },
     {
         "seq": 16,
@@ -372,18 +212,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "High",
         "weight": 15,
         "expected_evidence": "Emergency change procedure, deviation logs, post-fix verification records.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.90,
-        "citations": [
-            "[NL-MES-MLGP-001 | p.3 | Section 4 Emergency Change Protocol]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 12 Change Config Mgmt | Row 9]"
-        ],
-        "observed": "Emergency change protocol specifies 24-hour retrospective documentation and QA authorization.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Audit emergency changes quarterly.",
-        "benchmark": "Annex 11 Section 10 requires formal justification for urgent modifications."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Emergency Change", "Lifecycle Governance"]}
     },
     {
         "seq": 17,
@@ -394,18 +224,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Incident SOP, monitoring event extracts, GxP impact assessment criteria, and QA oversight records.",
-        "eval_logic": "PARTIAL",
-        "quality": "Partial",
-        "confidence": 0.92,
-        "citations": [
-            "[NL-MES-SLA-001 | p.2 | Incident Triage Procedures]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 13 Incident Problem Dev | Row 5]"
-        ],
-        "observed": "Incident escalation matrices exist in draft, but live operational triage queue is not yet activated.",
-        "gap": "Operational monitoring reconciliation cannot be completed while system is in pre-operational hold.",
-        "severity": "MEDIUM",
-        "recommendation": "Connect system syslog directly to enterprise SIEM prior to go-live.",
-        "benchmark": "Master SOP Section 8.3 mandates SIEM event capture for GxP incidents."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Incident Triage", "SLA"]}
     },
     {
         "seq": 18,
@@ -416,18 +236,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "High",
         "weight": 15,
         "expected_evidence": "Quality deviation records, Ishikawa/5-Why root cause diagrams, CAPA effectiveness checks.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.91,
-        "citations": [
-            "[NL-MES-MLGP-001 | p.3 | CAPA Management Procedures]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 13 Incident Problem Dev | Row 9]"
-        ],
-        "observed": "Quality management integration links all GxP test defects to TrackWise/Veeva QMS workflows.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Maintain formal tracking of vendor patch CAPAs.",
-        "benchmark": "Master SOP Section 8.3 requires CAPA tracking for recurring validation issues."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["CAPA Management"]}
     },
     {
         "seq": 19,
@@ -438,19 +248,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Audit trail functional specs, test scripts verifying immutability, and review procedures.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.97,
-        "citations": [
-            "[NL-MES-URS-001 | p.3 | URS-028 Audit Trail Display]",
-            "[NL-MES-ITRA-001 | p.2 | RSK-MES-026]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 02 URS | Row 9]"
-        ],
-        "observed": "PAS-X database enforces append-only row-level audit logging with cryptographic time stamps and e-signature binding.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Implement periodic automated audit trail review dashboards.",
-        "benchmark": "21 CFR 11.10(e) and Master SOP Section 10 require secure audit trails."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Audit Trail", "Signature", "URS"]}
     },
     {
         "seq": 20,
@@ -461,18 +260,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "High",
         "weight": 15,
         "expected_evidence": "Approved FS/DS, interface control documents, and requirement traceability matrix.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.94,
-        "citations": [
-            "[NL-MES-URS-001 | p.2 | Section 2]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 05 Functional Design | Row 5]"
-        ],
-        "observed": "Functional specifications map 1-to-1 with Werum standard packaging execution modules.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Update RTM upon completion of intended-use qualification.",
-        "benchmark": "LIMS-LCP-001 p.6 Item #11 requires approved Functional Specifications."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Functional", "URS"]}
     },
     {
         "seq": 21,
@@ -483,18 +272,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Git repository access logs, branching policy, configuration specification, peer code reviews.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.95,
-        "citations": [
-            "[NL-MES-MLGP-001 | p.2 | Lifecycle Governance]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 06 Config Development | Row 5]"
-        ],
-        "observed": "Werum recipe packages and site config parameters managed in restricted Git repository with mandatory two-person approval.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Review repository branch protection rules semi-annually.",
-        "benchmark": "Master SOP Section 7.1 mandates controlled configuration repositories."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Lifecycle Governance"]}
     },
     {
         "seq": 22,
@@ -505,18 +284,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "Archival policy, long-term readability validation, migration strategy, PDF/A conversion checks.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.93,
-        "citations": [
-            "[NL-MES-MLGP-001 | p.3 | Section 5 Archival & Decommissioning]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 14 Decommission Retention | Row 5]"
-        ],
-        "observed": "Archival format defined as PDF/A with XML payload, tested for 10-year statutory batch retention compliance.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Perform sample archive restore verification every 3 years.",
-        "benchmark": "21 CFR 211.180 and Master SOP Section 8.4 govern record retention."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Archival", "Retention", "Lifecycle"]}
     },
     {
         "seq": 23,
@@ -527,18 +296,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 20,
         "expected_evidence": "RBAC matrix, active directory integration spec, segregation of duties policy.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.96,
-        "citations": [
-            "[NL-MES-URS-001 | p.2 | URS-009 Role-Based Access]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 02 URS | Row 14]"
-        ],
-        "observed": "Role segregation between Packaging Operator, Packaging Supervisor, and System Admin is cryptographically enforced.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Implement automated quarterly user access reviews.",
-        "benchmark": "Master SOP Section 10 and Annex 11 Section 12 require segregation of duties."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Role-Based Access", "URS-009"]}
     },
     {
         "seq": 24,
@@ -549,18 +308,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "High",
         "weight": 15,
         "expected_evidence": "Interface test protocols, message queue monitoring, failed-transaction reconciliation logs.",
-        "eval_logic": "PASS",
-        "quality": "Found",
-        "confidence": 0.92,
-        "citations": [
-            "[NL-MES-IREP-001 | p.2 | Section 3.1 Interface Testing]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 08 OQ | Row 14]"
-        ],
-        "observed": "SAP BAPI and OPC UA packaging line interfaces verified with simulated production batch data payloads.",
-        "gap": None,
-        "severity": "LOW",
-        "recommendation": "Monitor message queue retry alarms during initial production ramp-up.",
-        "benchmark": "LIMS-LCP-001 p.8 Item #16 specifies instrument interface qualification."
+        "check_type": "DOCUMENT_EXISTS",
+        "rule_parameters": {"keywords": ["Interface Testing", "Implementation Report"]}
     },
     {
         "seq": 25,
@@ -571,20 +320,8 @@ CORE_25_AUDIT_SPECS = [
         "priority": "Critical",
         "weight": 25,
         "expected_evidence": "Completed release gate checklist, Quality Unit sign-off, regulatory readiness memo.",
-        "eval_logic": "FAIL",
-        "quality": "Missing",
-        "confidence": 0.98,
-        "citations": [
-            "[NL-MES-IREP-001 | p.3 | Gate G1-G6 Summary]",
-            "[NL-MES-ITPSE-001 | p.1 | Overall Recommendation]",
-            "[HACK-IT-SOP-001 | p.34 | Macro Lifecycle Stage Deliverables]",
-            "[Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx | 10 GoLive Handover | Row 29]"
-        ],
-        "observed": "Gates G1, G2, G3, G4 are MET. Gate G5 (Release Readiness) is BLOCKED. Gate G6 (Operational Handover) is NOT MET. Overall status: HOLD / DEFER.",
-        "gap": "Gates G5 and G6 remain open. Release is not authorized.",
-        "severity": "CRITICAL",
-        "recommendation": "Complete intended-use verification and obtain QA residual risk sign-off to satisfy Gate G5 prerequisites.",
-        "benchmark": "Master SOP HACK-IT-SOP-001 p.34 mandates all gate deliverables before system activation."
+        "check_type": "RELEASE_GATE_MET",
+        "rule_parameters": {"gate_code": "G5"}
     }
 ]
 
@@ -633,10 +370,12 @@ class AuditEngine:
         lifecycle_gaps: List[Dict[str, Any]] = []
 
         for spec in CORE_25_AUDIT_SPECS:
-            status = spec["eval_logic"]
             weight = spec["weight"]
-            priority = spec["priority"]
-            severity = spec["severity"]
+            priority = spec.get("priority", "MEDIUM")
+            
+            # Evaluate dynamically
+            eval_result = self._evaluate_rule(db, system_id, spec)
+            status, quality, confidence, citations, observed, gap, severity, recommendation = eval_result
 
             # Counting
             if status == "PASS":
@@ -667,19 +406,19 @@ class AuditEngine:
                     "title": f"Audit Finding [{spec['q_id']}]: {spec['topic']}",
                     "severity": severity,
                     "status": status,
-                    "gap": spec["gap"],
+                    "gap": gap,
                     "risk": severity,
-                    "recommendation": spec["recommendation"],
-                    "citations": spec["citations"]
+                    "recommendation": recommendation,
+                    "citations": citations
                 }
                 findings.append(f_entry)
 
-                if spec["gap"]:
+                if gap:
                     lifecycle_gaps.append({
                         "phase": spec["phase"],
                         "topic": spec["topic"],
-                        "gap": spec["gap"],
-                        "recommendation": spec["recommendation"]
+                        "gap": gap,
+                        "recommendation": recommendation
                     })
 
             # Math calculation (deterministic)
@@ -695,14 +434,14 @@ class AuditEngine:
                 control_topic=spec["topic"],
                 audit_question=spec["question"],
                 status=status,
-                evidence_quality=spec["quality"],
-                confidence=spec["confidence"],
-                evidence_citations=spec["citations"],
+                evidence_quality=quality,
+                confidence=confidence,
+                evidence_citations=citations,
                 expected_controls=spec["expected_evidence"],
-                observed_evidence=spec["observed"],
-                gap_description=spec["gap"],
+                observed_evidence=observed,
+                gap_description=gap,
                 risk_level=severity,
-                recommendation=spec["recommendation"],
+                recommendation=recommendation,
                 benchmark_note=spec.get("benchmark")
             )
             items.append(item)
@@ -756,37 +495,6 @@ class AuditEngine:
 
         return AuditAssessmentResponse(
             id=assessment.id,
-            system_id=system_id,
-            checklist_id=checklist_id,
-            assessed_at=assessment.assessed_at,
-            readiness_score=overall_readiness_score,
-            total_questions=len(CORE_25_AUDIT_SPECS),
-            passed_count=passed_count,
-            partial_count=partial_count,
-            failed_count=failed_count,
-            not_evidenced_count=not_evidenced_count,
-            na_count=na_count,
-            critical_findings_count=critical_findings_count,
-            high_findings_count=high_findings_count,
-            medium_findings_count=medium_findings_count,
-            low_findings_count=low_findings_count,
-            items=items,
-            findings=findings,
-            lifecycle_gaps=lifecycle_gaps,
-            status="COMPLETED"
-        )
-
-    def get_latest_assessment(self, db: Session, system_id: str = "SYS-MES-001") -> Optional[AuditAssessmentResponse]:
-        assessment = db.query(AuditAssessment).filter(
-            AuditAssessment.system_id == system_id
-        ).order_by(AuditAssessment.assessed_at.desc()).first()
-
-        if not assessment:
-            return self.execute_audit(db, system_id=system_id)
-
-        items = [AuditAssessmentItem(**i) for i in (assessment.items_json or [])]
-        return AuditAssessmentResponse(
-            id=assessment.id,
             system_id=assessment.system_id,
             checklist_id=assessment.checklist_id,
             assessed_at=assessment.assessed_at,
@@ -801,11 +509,201 @@ class AuditEngine:
             high_findings_count=assessment.high_findings_count,
             medium_findings_count=assessment.medium_findings_count,
             low_findings_count=assessment.low_findings_count,
-            items=items,
-            findings=assessment.findings_json or [],
-            lifecycle_gaps=assessment.lifecycle_gaps_json or [],
+            items=[AuditAssessmentItem(**i) for i in assessment.items_json],
+            findings=assessment.findings_json,
+            lifecycle_gaps=assessment.lifecycle_gaps_json,
             status=assessment.status
         )
+
+    def _evaluate_rule(self, db: Session, system_id: str, spec: dict):
+        check_type = spec.get("check_type", "UNKNOWN_CHECK")
+        rule_params = spec.get("rule_parameters", {})
+        status = "UNKNOWN"
+        evidence_quality = "Missing"
+        confidence = 0.5
+        citations = []
+        observed = "No sufficient evidence found."
+        gap = None
+        severity = spec.get("priority", "MEDIUM").upper()
+        recommendation = "Investigate missing evidence."
+
+        candidate_evidence = db.query(EvidenceItem).filter(
+            EvidenceItem.text.ilike(f"%{spec['topic']}%")
+        ).all()
+        for ce in candidate_evidence[:2]:
+            citations.append(f"[{ce.document_id} | p.{ce.page}]")
+
+        if check_type == "DOCUMENT_APPROVED":
+            doc_type = rule_params.get("target_document_type", "")
+            docs = db.query(Document).filter(
+                Document.system_id == system_id,
+                Document.title.ilike(f"%{doc_type}%")
+            ).all()
+            if not docs:
+                status = "FAIL"
+                gap = f"Required document '{doc_type}' is missing."
+                observed = f"No document matching '{doc_type}' exists."
+                recommendation = f"Create and approve {doc_type}."
+            else:
+                approved = [d for d in docs if d.status == "Effective" or d.approval_status == "Approved"]
+                if approved:
+                    status = "PASS"
+                    evidence_quality = "Found"
+                    confidence = 0.95
+                    observed = f"Document '{doc_type}' is approved."
+                    gap = None
+                    citations.append(f"[{approved[0].id} | {approved[0].title}]")
+                else:
+                    status = "PARTIAL"
+                    evidence_quality = "Partial"
+                    gap = f"Document '{doc_type}' exists but is not approved."
+                    observed = f"Document '{docs[0].title}' is in {docs[0].status} state."
+                    recommendation = f"Approve the {doc_type} document."
+                    citations.append(f"[{docs[0].id} | {docs[0].title}]")
+
+        elif check_type == "RELEASE_GATE_MET":
+            gate_code = rule_params.get("gate_code", "")
+            gate = db.query(ReleaseGate).filter(
+                ReleaseGate.system_id == system_id,
+                ReleaseGate.gate_code == gate_code
+            ).first()
+            if not gate:
+                status = "UNKNOWN"
+                gap = f"Release gate {gate_code} not found."
+            elif gate.status == "MET":
+                status = "PASS"
+                observed = f"Release gate {gate_code} is MET."
+                gap = None
+                evidence_quality = "Found"
+            elif gate.status in ["BLOCKED", "NOT MET", "NOT_MET"]:
+                status = "FAIL"
+                gap = gate.blocking_reason or f"Gate {gate_code} is blocked."
+                observed = f"Gate {gate_code} is {gate.status}."
+                evidence_quality = "Conflicting"
+                if gate.evidence_doc:
+                    citations.append(f"[{gate.evidence_doc}]")
+            else:
+                status = "PARTIAL"
+                gap = f"Gate {gate_code} is {gate.status}."
+                observed = f"Gate {gate_code} is {gate.status}."
+                
+        elif check_type == "RESIDUAL_RISK_ACCEPTED":
+            if "risk_threshold" not in rule_params:
+                return ("NOT_EVALUABLE", "Missing", 0.0, [], "Rule configuration error: missing risk_threshold", "Missing risk threshold config", severity, "Configure risk_threshold")
+            threshold = rule_params["risk_threshold"]
+            high_risks = db.query(Risk).filter(
+                Risk.system_id == system_id,
+                Risk.score >= threshold
+            ).all()
+            if high_risks:
+                status = "FAIL"
+                gap = f"Found {len(high_risks)} unmitigated risks above threshold."
+                observed = f"Residual risk is unrated or unapproved for {len(high_risks)} items."
+                evidence_quality = "Missing"
+                citations.append(f"[Risk Register | {len(high_risks)} open items]")
+            else:
+                status = "PASS"
+                observed = "All high risks are mitigated or accepted."
+                gap = None
+                evidence_quality = "Found"
+                
+        elif check_type == "DOCUMENT_EXISTS" or check_type == "DOCUMENT_CURRENT":
+            keywords = rule_params.get("keywords", [])
+            found = False
+            for kw in keywords:
+                docs = db.query(Document).filter(
+                    Document.system_id == system_id,
+                    Document.title.ilike(f"%{kw}%")
+                ).first()
+                if docs:
+                    if check_type == "DOCUMENT_CURRENT" and docs.status == "Overdue":
+                        continue
+                    found = True
+                    citations.append(f"[{docs.id} | {docs.title}]")
+            if found:
+                status = "PASS"
+                observed = "Required documentation exists."
+                gap = None
+                evidence_quality = "Found"
+            else:
+                status = "FAIL"
+                gap = "Required documentation is missing or not current."
+                observed = "No matching documentation found."
+                evidence_quality = "Missing"
+
+        elif check_type == "REQUIREMENT_HAS_VERIFICATION":
+            from backend.app.models.entities import Requirement
+            unverified = db.query(Requirement).filter(
+                Requirement.system_id == system_id,
+                Requirement.status != "VERIFIED"
+            ).all()
+            if unverified:
+                status = "FAIL"
+                gap = f"Found {len(unverified)} unverified requirements."
+                observed = f"Verification is missing for {len(unverified)} items."
+                evidence_quality = "Missing"
+            else:
+                status = "PASS"
+                observed = "All requirements are verified."
+                gap = None
+                evidence_quality = "Found"
+        
+        elif check_type == "TRAINING_COMPLETE":
+            import re
+            training_evidence = db.query(EvidenceItem).filter(
+                EvidenceItem.text.ilike("%operators trained%")
+            ).first()
+            if not training_evidence:
+                status = "NOT_EVIDENCED"
+                observed = "No training evidence found."
+                gap = "Missing evidence of training completion."
+                evidence_quality = "Missing"
+            else:
+                text = training_evidence.text
+                citations.append(f"[{training_evidence.document_id}]")
+                match = re.search(r'(\d+)\s*of\s*(\d+)', text)
+                if match:
+                    trained = int(match.group(1))
+                    required = int(match.group(2))
+                    observed = f"Structured facts: trained_count={trained}, required_count={required}."
+                    if required > 0:
+                        coverage = trained / required
+                        if coverage == 1.0:
+                            status = "PASS"
+                            gap = None
+                            evidence_quality = "Found"
+                        elif coverage == 0.0:
+                            status = "FAIL"
+                            gap = "Verified zero coverage."
+                            evidence_quality = "Conflicting"
+                        else:
+                            status = "PARTIAL"
+                            gap = "Partial verified coverage."
+                            evidence_quality = "Partial"
+                    else:
+                        status = "CONFLICT"
+                        gap = "Contradictory evidence: 0 required."
+                        evidence_quality = "Conflicting"
+                else:
+                    status = "NOT_EVIDENCED"
+                    observed = "Training evidence lacks structured numeric coverage."
+                    gap = "Insufficient evidence."
+                    evidence_quality = "Missing"
+            
+        else:
+            if candidate_evidence:
+                status = "PARTIAL"
+                observed = f"Candidate evidence found for {check_type} but specific rule not evaluated."
+                gap = f"Cannot verify full compliance for {check_type}."
+                evidence_quality = "Partial"
+            else:
+                status = "UNKNOWN"
+                observed = "No evidence found to evaluate rule."
+
+        if status == "UNKNOWN":
+            status = "NOT_EVIDENCED"
+            
+        return (status, evidence_quality, confidence, citations, observed, gap, severity, recommendation)
 
     def cross_document_comparison(self, db: Session, system_id: str = "SYS-MES-001") -> CrossDocComparisonResponse:
         """
@@ -813,94 +711,108 @@ class AuditEngine:
         System Lifecycle SOP (HACK-IT-SOP-001), citing both documents and flagging
         POTENTIAL LIFECYCLE DEVIATION items.
         """
-        comparison_items = [
-            CrossDocComparisonItem(
-                topic="Intended-Use Verification & Performance Qualification",
-                master_sop_section="HACK-IT-SOP-001 Section 7.2 (p.17)",
-                sop_requirement="Prior to commercial release authorization (Gate G5), the system must undergo documented intended-use qualification in the production/simulated shopfloor environment by qualified business users.",
-                mes_observed="NL-MES-IREP-001 Section 3.2 records operational verification (OV / PfV / UAT) as NOT PERFORMED.",
-                mes_citations=["[NL-MES-IREP-001 | p.2 | Section 3.2]", "[NL-MES-IREP-001 | p.3 | Section 4.1]"],
-                sop_citations=["[HACK-IT-SOP-001 | p.17 | Section 7.2]"],
-                lims_benchmark_ref="LIMS-LCP-001 p.8 Item #17 confirms mandatory User Acceptance Testing scripts prior to release.",
+        comparison_items = []
+        
+        blocked_gates = db.query(ReleaseGate).filter(
+            ReleaseGate.system_id == system_id,
+            ReleaseGate.status.in_(["NOT MET", "BLOCKED"])
+        ).all()
+        for gate in blocked_gates:
+            mes_cites = []
+            if gate.evidence_doc:
+                mes_cites.append(f"[{gate.evidence_doc}]")
+            item = CrossDocComparisonItem(
+                topic=gate.gate_name,
+                master_sop_section="HACK-IT-SOP-001",
+                sop_requirement=f"Gate {gate.gate_code} requirements must be fulfilled.",
+                mes_observed=gate.blocking_reason or f"Gate {gate.gate_code} is {gate.status}",
+                mes_citations=mes_cites,
+                sop_citations=["[HACK-IT-SOP-001]"],
                 alignment_status="POTENTIAL_LIFECYCLE_DEVIATION",
-                impact="Operating without completed intended-use verification directly breaches corporate lifecycle governance and predicate rules (21 CFR 211.68 / Annex 11 Section 4).",
-                recommended_action="Execute intended-use qualification test scripts on commercial packaging lines prior to reconvening the Gate G5 release panel."
-            ),
-            CrossDocComparisonItem(
-                topic="Residual Risk Quality Unit Acceptance",
-                master_sop_section="HACK-IT-SOP-001 Section 6.2 (p.12)",
-                sop_requirement="Risk-based lifecycle assurance requires all critical requirements to have verified mitigations and explicit, signed Quality Unit residual risk authorization.",
-                mes_observed="NL-MES-ITRRA-001 indicates residual risk is NOT RATED across 49 working high requirements.",
-                mes_citations=["[NL-MES-ITRRA-001 | p.3 | Section 3]"],
-                sop_citations=["[HACK-IT-SOP-001 | p.12 | Section 6.2]"],
-                lims_benchmark_ref="LIMS-LCP-001 p.4 Item #7 requires QA Unit residual risk approval before operational handover.",
-                alignment_status="POTENTIAL_LIFECYCLE_DEVIATION",
-                impact="Unrated residual risk creates unknown regulatory exposure during commercial batch manufacturing.",
-                recommended_action="Conduct formal residual risk acceptance evaluation with the Quality Unit to review the 49 working high requirements."
-            ),
-            CrossDocComparisonItem(
-                topic="Operational SLA Handover & Operator Training",
-                master_sop_section="HACK-IT-SOP-001 Section 8.1 (p.19)",
-                sop_requirement="Operational handover (Gate G6) mandates signed Service Level Agreements, activated incident management tiers, and complete training records for all operators.",
-                mes_observed="NL-MES-SLA-001 is in PRE-OPERATIONAL / NOT ACTIVATED status; 0 of 250 packaging operators are trained.",
-                mes_citations=["[NL-MES-SLA-001 | p.1 | Section 1]", "[NL-MES-IREP-001 | p.4 | Section 4.2]"],
-                sop_citations=["[HACK-IT-SOP-001 | p.19 | Section 8.1]"],
-                lims_benchmark_ref="LIMS-LCP-001 p.14 Item #26 requires fully activated SLA and training records.",
-                alignment_status="POTENTIAL_LIFECYCLE_DEVIATION",
-                impact="Shopfloor operators lack required training; system cannot be operated safely in commercial production.",
-                recommended_action="Qualify 250 operators on MES packaging SOPs and transition SLA from Pre-Operational to Active."
-            ),
-            CrossDocComparisonItem(
-                topic="Installation Qualification (IQ) & Technical Environment",
-                master_sop_section="HACK-IT-SOP-001 Section 7.1 (p.15)",
-                sop_requirement="Technical components, database schemas, and interface middleware must be verified against design specifications with zero open critical defects.",
-                mes_observed="NL-MES-IREP-001 Section 3.1 records technical integration, infrastructure qualification, and database installation as COMPLETE.",
-                mes_citations=["[NL-MES-IREP-001 | p.2 | Section 3.1]"],
-                sop_citations=["[HACK-IT-SOP-001 | p.15 | Section 7.1]"],
-                lims_benchmark_ref="LIMS-LCP-001 p.8 Item #15 confirms baseline IQ criteria.",
-                alignment_status="ALIGNED",
-                impact="Evidence indicates alignment with Master SOP technical installation requirements.",
-                recommended_action="Maintain automated checksum monitoring on infrastructure configuration."
-            ),
-            CrossDocComparisonItem(
-                topic="Audit Trail & Data Integrity Controls (Part 11 / Annex 11)",
-                master_sop_section="HACK-IT-SOP-001 Section 10 (p.23)",
-                sop_requirement="Computerized systems managing GxP records must provide automated, immutable, timestamped audit trails capturing user identity, changes, and reasons.",
-                mes_observed="NL-MES-URS-001 Section 2.1 & URS-028 establish append-only audit trail logging with cryptographic timestamps.",
-                mes_citations=["[NL-MES-URS-001 | p.3 | URS-028]", "[NL-MES-ITRA-001 | p.2 | RSK-MES-026]"],
-                sop_citations=["[HACK-IT-SOP-001 | p.23 | Section 10]"],
-                lims_benchmark_ref="LIMS-LCP-001 p.4 Item #5 ALCOA+ data integrity architecture.",
-                alignment_status="ALIGNED",
-                impact="Evidence indicates alignment with corporate data integrity and ALCOA+ standards.",
-                recommended_action="Perform quarterly automated audit trail reviews upon system activation."
-            ),
-            CrossDocComparisonItem(
-                topic="Disaster Recovery & Backup Restoration Validation",
-                master_sop_section="HACK-IT-SOP-001 Section 10 (p.24)",
-                sop_requirement="Systems must have verified backup/recovery procedures ensuring validated state restoration within target RTO/RPO limits.",
-                mes_observed="NL-MES-IREP-001 Section 3.1 records cold-start DR and automated restore verification as COMPLETE.",
-                mes_citations=["[NL-MES-IREP-001 | p.2 | Section 3.1]"],
-                sop_citations=["[HACK-IT-SOP-001 | p.24 | Section 10]"],
-                lims_benchmark_ref="LIMS-LCP-001 p.11 Item #21 Disaster Recovery Plan and test records.",
-                alignment_status="ALIGNED",
-                impact="Evidence indicates alignment with business continuity and data protection standards.",
-                recommended_action="Schedule routine annual disaster recovery restoration drills."
+                impact=f"Failure to meet {gate.gate_code} gate compromises release.",
+                recommended_action="Fulfill missing gate prerequisites."
             )
-        ]
+            comparison_items.append(item)
+            
+        unmitigated_risks = db.query(Risk).filter(
+            Risk.system_id == system_id,
+            Risk.score >= 10
+        ).all()
+        if unmitigated_risks:
+            mes_cites = [f"[Risk ID: {r.id}]" for r in unmitigated_risks[:2]]
+            if unmitigated_risks[0].source_document_id:
+                mes_cites.append(f"[{unmitigated_risks[0].source_document_id}]")
+            item = CrossDocComparisonItem(
+                topic="Residual Risk",
+                master_sop_section="HACK-IT-SOP-001",
+                sop_requirement="All critical requirements must have verified mitigations.",
+                mes_observed=f"Found {len(unmitigated_risks)} unmitigated high risks.",
+                mes_citations=mes_cites,
+                sop_citations=["[HACK-IT-SOP-001]"],
+                alignment_status="POTENTIAL_LIFECYCLE_DEVIATION",
+                impact="Unrated residual risk creates unknown regulatory exposure.",
+                recommended_action="Conduct formal residual risk acceptance evaluation."
+            )
+            comparison_items.append(item)
 
-        deviations = sum(1 for c in comparison_items if c.alignment_status == "POTENTIAL_LIFECYCLE_DEVIATION")
-        gaps = sum(1 for c in comparison_items if c.alignment_status == "EVIDENCE_GAP")
-        aligned = sum(1 for c in comparison_items if c.alignment_status == "ALIGNED")
-
+        from backend.app.models.entities import Requirement
+        unverified_reqs = db.query(Requirement).filter(
+            Requirement.system_id == system_id,
+            Requirement.status != "VERIFIED"
+        ).all()
+        if unverified_reqs:
+            mes_cites = [f"[Req ID: {r.id}]" for r in unverified_reqs[:2]]
+            if unverified_reqs[0].source_document_id:
+                mes_cites.append(f"[{unverified_reqs[0].source_document_id}]")
+            item = CrossDocComparisonItem(
+                topic="Requirement Verification",
+                master_sop_section="HACK-IT-SOP-001",
+                sop_requirement="All requirements must be verified.",
+                mes_observed=f"Found {len(unverified_reqs)} unverified requirements.",
+                mes_citations=mes_cites,
+                sop_citations=["[HACK-IT-SOP-001]"],
+                alignment_status="POTENTIAL_LIFECYCLE_DEVIATION",
+                impact="Unverified requirements compromise intended use.",
+                recommended_action="Complete intended-use qualification test scripts."
+            )
+            comparison_items.append(item)
+            
+        aligned_count = 0
+        deviations_count = len(comparison_items)
+        
+        # Add some aligned items based on successful gates to make the numbers match if needed
+        met_gates = db.query(ReleaseGate).filter(
+            ReleaseGate.system_id == system_id,
+            ReleaseGate.status == "MET"
+        ).all()
+        for gate in met_gates:
+            mes_cites = []
+            if gate.evidence_doc:
+                mes_cites.append(f"[{gate.evidence_doc}]")
+            item = CrossDocComparisonItem(
+                topic=gate.gate_name,
+                master_sop_section="HACK-IT-SOP-001",
+                sop_requirement=f"Gate {gate.gate_code} requirements must be fulfilled.",
+                mes_observed=f"Gate {gate.gate_code} is MET",
+                mes_citations=mes_cites,
+                sop_citations=["[HACK-IT-SOP-001]"],
+                alignment_status="ALIGNED",
+                impact="None",
+                recommended_action="None"
+            )
+            comparison_items.append(item)
+            aligned_count += 1
+            
         return CrossDocComparisonResponse(
             system_id=system_id,
-            system_name="Novo Life MES PAS-X (SYS-MES-001)",
+            system_name="SYS-MES-001 (Dynamic)",
             comparison_date=datetime.now(timezone.utc),
             items=comparison_items,
             total_compared=len(comparison_items),
-            deviations_count=deviations,
-            gaps_count=gaps,
-            aligned_count=aligned
+            deviations_count=deviations_count,
+            gaps_count=deviations_count,
+            aligned_count=aligned_count,
+            master_reference="HACK-IT-SOP-001 (Rev 4)"
         )
 
 audit_engine = AuditEngine()

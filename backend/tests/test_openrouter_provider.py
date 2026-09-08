@@ -22,12 +22,18 @@ def test_openrouter_health_check_no_secret_exposure():
 
 def test_deterministic_fallback_generation():
     provider = OpenRouterProvider(api_key="")
-    ans = provider.generate("Is the MES PAS-X system audit ready?")
-    assert "Audit Readiness Assessment" in ans
-    assert "HOLD / DEFER" in ans or "PRE-OPERATIONAL" in ans
+    # With context
+    prompt = "CONTEXT:\n--- SOURCE: Test Doc ---\nThis is some evidence.\n\nUSER QUESTION: Is it ready?"
+    ans = provider.generate(prompt)
+    assert "OFFLINE EVIDENCE SUMMARY" in ans
+    assert "Assessment: UNKNOWN / NOT ASSESSED" in ans
+    assert "[Test Doc]" in ans
+    assert "This is some evidence." in ans
 
+    # Without context
     blocker_ans = provider.generate("What is blocking release?")
-    assert "Gate G5" in blocker_ans or "verification" in blocker_ans.lower()
+    assert "OFFLINE EVIDENCE SUMMARY" in blocker_ans
+    assert "Unsupported / missing" in blocker_ans
 
 def test_deterministic_embedding_provider():
     emb_provider = get_embedding_provider()

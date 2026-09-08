@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     VECTOR_STORE_PATH: str = os.path.join(DATA_DIR, "vector_store")
     SEED_DIR: str = os.path.join(DATA_DIR, "seed")
     MOCK_ENTERPRISE_DIR: str = os.path.join(DATA_DIR, "mock_enterprise")
-    SAMPLE_DOCS_DIR: str = os.path.join(DATA_DIR, "sample_documents")
+    SAMPLE_DOCS_DIR: str = os.path.join(DATA_DIR, "pasx_documents")
     
     # Flags & Mocks
     DEMO_MODE: bool = True

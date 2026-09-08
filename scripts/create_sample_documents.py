@@ -216,7 +216,7 @@ def create_sop_document_management(output_path: str):
     print(f"Created {output_path}")
 
 if __name__ == '__main__':
-    target_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'sample_documents')
+    target_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'legacy', 'sample_documents')
     os.makedirs(target_dir, exist_ok=True)
     create_system_a_urs(os.path.join(target_dir, 'System_A_URS.docx'))
     create_system_a_risk_assessment(os.path.join(target_dir, 'System_A_Risk_Assessment.docx'))

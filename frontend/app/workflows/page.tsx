@@ -26,7 +26,7 @@ export default function WorkflowsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const res = await api.getAllWorkflows();
+      const res = await api.getAllWorkflows('SYS-MES-001');
       setWorkflows(res);
     } catch (err) {
       console.error(err);

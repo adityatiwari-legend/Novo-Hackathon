@@ -5,6 +5,7 @@ from pypdf import PdfReader
 from docx import Document as DocxDocument
 import openpyxl
 from backend.app.core.security import compute_sha256
+from backend.app.services.date_parser import parse_date
 
 class ParsedChunk:
     def __init__(self, content: str, chunk_index: int, page_number: int = None, section: str = None, metadata: Dict[str, Any] = None):
@@ -32,13 +33,19 @@ class ParsedDocumentResult:
         extracted_requirements: List[Dict[str, Any]] = None,
         extracted_risks: List[Dict[str, Any]] = None,
         extracted_gates: List[Dict[str, Any]] = None,
-        structured_audit_questions: List[Dict[str, Any]] = None
+        structured_audit_questions: List[Dict[str, Any]] = None,
+        effective_from: str = None,
+        effective_to: str = None,
+        issue_date: str = None,
+        review_due: str = None,
+        approver: str = None
     ):
         self.title = title
         self.document_id = document_id or title
         self.document_type = document_type
         self.version = version
         self.owner = owner
+        self.approver = approver
         self.system_id = system_id
         self.review_date = review_date
         self.approval_status = approval_status
@@ -50,6 +57,10 @@ class ParsedDocumentResult:
         self.extracted_risks = extracted_risks or []
         self.extracted_gates = extracted_gates or []
         self.structured_audit_questions = structured_audit_questions or []
+        self.effective_from = effective_from
+        self.effective_to = effective_to
+        self.issue_date = issue_date
+        self.review_due = review_due
 
 def detect_document_type(filename: str, text: str) -> str:
     lower_fn = filename.lower()
@@ -101,6 +112,12 @@ def extract_document_id(filename: str, text: str) -> str:
     lower_fn = filename.lower()
     lower_tx = text[:3000].lower()
     
+    # Handle Canonical NOVOLIFE-MES files (e.g., NOVOLIFE-MES-URS-...)
+    m_novo = re.search(r'NOVOLIFE-MES-([A-Z]+)-', filename, re.IGNORECASE)
+    if m_novo:
+        doc_type = m_novo.group(1).upper()
+        return f"NL-MES-{doc_type}-001"
+    
     if "hack-it-sop-001" in lower_fn or "master_it_system_lifecycle_sop" in lower_fn or "hack-it-sop-001" in lower_tx:
         return "HACK-IT-SOP-001"
     if "lims-lcp-001" in lower_fn or "lims_lifecycle" in lower_fn or "lims-lcp-001" in lower_tx:
@@ -123,70 +140,77 @@ def extract_structured_gxp_entities(raw_text: str, doc_id: str, system_id: str =
     risks = []
     gates = []
 
-    # 1. Requirement Extraction (e.g. URS-001 to URS-050)
-    req_matches = re.finditer(r'(URS-\d{3})\s*\|\s*(FUNCTIONAL|NON-FUNCTIONAL)\s*\|\s*([^|\n]{10,250})', raw_text, re.IGNORECASE)
-    seen_reqs = set()
-    for m in req_matches:
-        r_id = m.group(1).upper()
-        r_type = m.group(2).upper()
-        r_desc = m.group(3).strip()
-        if r_id not in seen_reqs:
-            seen_reqs.add(r_id)
-            requirements.append({
-                "requirement_id": r_id,
-                "system_id": system_id,
-                "document_id": doc_id,
-                "text": r_desc,
-                "type": r_type,
-                "source_page": 2 if int(r_id[-3:]) <= 25 else 3,
-                "source_section": "2. Functional Requirements" if r_type == "FUNCTIONAL" else "3. Non-Functional Requirements",
-                "risk_reference": "RSK-MES-026" if r_id == "URS-028" else "RSK-MES-001",
-                "verification_reference": "VR-MES-" + r_id[-3:],
-                "status": "OPEN"
-            })
+    # 1. Requirement Extraction (e.g. URS-MES-001 to URS-MES-050)
+    if "URS-001" in doc_id:
+        req_matches = re.finditer(r'(URS(?:-MES)?-\d{3})\s*\|\s*([^|\n]{10,250})\s*\|', raw_text, re.IGNORECASE)
+        seen_reqs = set()
+        for m in req_matches:
+            r_id = m.group(1).upper()
+            if "URS-MES" not in r_id:
+                r_id = r_id.replace("URS-", "URS-MES-")
+            r_desc = m.group(2).strip()
+            if r_id not in seen_reqs:
+                seen_reqs.add(r_id)
+                r_type = "FUNCTIONAL" if int(r_id[-3:]) <= 25 else "NON-FUNCTIONAL"
+                requirements.append({
+                    "requirement_id": r_id,
+                    "system_id": system_id,
+                    "document_id": doc_id,
+                    "text": r_desc,
+                    "type": r_type,
+                    "source_page": 2 if r_type == "FUNCTIONAL" else 3,
+                    "source_section": "2. Functional Requirements" if r_type == "FUNCTIONAL" else "3. Non-Functional Requirements",
+                    "status": "OPEN"
+                })
 
     # 2. Risk Extraction (e.g. RSK-MES-001 to RSK-MES-026)
-    risk_matches = re.finditer(r'(RSK-MES-\d{3})\s*\|\s*([^|\n]{10,250})\s*\|\s*([^|\n]{3,30})\s*\|\s*(HIGH|MEDIUM|LOW)', raw_text, re.IGNORECASE)
-    seen_risks = set()
-    for m in risk_matches:
-        rk_id = m.group(1).upper()
-        rk_desc = m.group(2).strip()
-        rk_impact = m.group(3).strip()
-        rk_sev = m.group(4).upper()
-        if rk_id not in seen_risks:
-            seen_risks.add(rk_id)
-            risks.append({
-                "id": rk_id,
-                "system_id": system_id,
-                "risk_level": rk_sev,
-                "impact_type": rk_impact,
-                "likelihood": "High" if rk_sev == "HIGH" else "Medium",
-                "impact": "High" if rk_sev == "HIGH" else "Medium",
-                "score": 16 if rk_sev == "HIGH" else 8,
-                "rationale": rk_desc,
-                "control_mapping": "ICH Q9 / NL-MES-URS-001"
-            })
+    if "ITRRA-001" in doc_id:
+        risk_matches = re.finditer(r'(RSK-MES-\d{3})\s*\|\s*([^|\n]+)\s*\|\s*([^|\n]+)\s*\|\s*([^|\n]+)\s*\|\s*([^|\n]+)\s*\|', raw_text, re.IGNORECASE)
+        seen_risks = set()
+        for m in risk_matches:
+            rk_id = m.group(1).upper()
+            rk_desc = m.group(2).strip()
+            rk_impact = m.group(3).strip()
+            rk_mapping = m.group(4).strip()
+            rk_sev_raw = m.group(5).upper()
+            
+            rk_sev = "HIGH" if "HIGH" in rk_sev_raw else "MEDIUM" if "MEDIUM" in rk_sev_raw else "LOW"
+
+            if rk_id not in seen_risks:
+                seen_risks.add(rk_id)
+                risks.append({
+                    "id": rk_id,
+                    "system_id": system_id,
+                    "risk_level": rk_sev,
+                    "impact_type": rk_impact,
+                    "likelihood": "High" if rk_sev == "HIGH" else "Medium",
+                    "impact": "High" if rk_sev == "HIGH" else "Medium",
+                    "score": 16 if rk_sev == "HIGH" else 8,
+                    "rationale": rk_desc,
+                    "control_mapping": rk_mapping
+                })
 
     # 3. Release Gate Extraction (e.g. Gate G1 to G6)
-    gate_matches = re.finditer(r'Gate\s+(G[1-6])\s*\(([^)]+)\)\s*:\s*(MET|NOT MET|PENDING|BLOCKED)', raw_text, re.IGNORECASE)
-    seen_gates = set()
-    for m in gate_matches:
-        g_code = m.group(1).upper()
-        g_name = m.group(2).strip()
-        g_status = m.group(3).upper()
-        if g_code not in seen_gates:
-            seen_gates.add(g_code)
-            blocking = None
-            if "NOT MET" in g_status or "BLOCKED" in g_status:
-                blocking = f"{g_code} blocked: Prerequisites or verification incomplete."
-            gates.append({
-                "gate_code": g_code,
-                "gate_name": g_name,
-                "status": g_status,
-                "evidence_doc": doc_id,
-                "evidence_section": "Lifecycle Phase Gate Status",
-                "blocking_reason": blocking
-            })
+    if "VSR-001" in doc_id:
+        gate_matches = re.finditer(r'\b(G[0-6])\s*\|\s*([^|\n]+)\s*\|\s*(MET|NOT MET|PENDING|BLOCKED)\b', raw_text, re.IGNORECASE)
+        seen_gates = set()
+        for m in gate_matches:
+            g_code = m.group(1).upper()
+            g_name = m.group(2).strip()
+            g_status = m.group(3).upper()
+            if g_code not in seen_gates:
+                seen_gates.add(g_code)
+                blocking = None
+                if "NOT MET" in g_status or "BLOCKED" in g_status:
+                    blocking = f"{g_code} blocked: Prerequisites or verification incomplete."
+                gates.append({
+                    "gate_code": g_code,
+                    "gate_name": g_name,
+                    "status": g_status,
+                    "evidence_doc": doc_id,
+                    "evidence_section": "Lifecycle Phase Gate Status",
+                    "blocking_reason": blocking
+                })
 
     return requirements, risks, gates
 
@@ -244,13 +268,31 @@ def extract_metadata_from_text(text: str, filename: str) -> Dict[str, str]:
         approval_status = "In Review"
         
     title = filename
+    
+    eff_match = re.search(r'(?:effective date|effective from)\s*[:=]?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[A-Za-z]+ [0-9]{1,2},? [0-9]{4})', text, re.IGNORECASE)
+    effective_from = eff_match.group(1) if eff_match else None
+    
+    eff_to_match = re.search(r'(?:effective to|valid until|expiry date)\s*[:=]?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[A-Za-z]+ [0-9]{1,2},? [0-9]{4})', text, re.IGNORECASE)
+    effective_to = eff_to_match.group(1) if eff_to_match else None
+    
+    iss_match = re.search(r'(?:issue date|issued on)\s*[:=]?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[A-Za-z]+ [0-9]{1,2},? [0-9]{4})', text, re.IGNORECASE)
+    issue_date = iss_match.group(1) if iss_match else None
+
+    appr_match = re.search(r'(?:approver|approved by)\s*[:=]?\s*([A-Za-z0-9\.\s\(\)-]{3,40})(?:\n|$)', text, re.IGNORECASE)
+    approver = appr_match.group(1).strip() if appr_match else "Quality Assurance"
+    
     return {
         "title": title[:200],
         "version": version,
         "review_date": review_date,
         "owner": owner,
+        "approver": approver,
         "approval_status": approval_status,
-        "classification": "Internal Use"
+        "classification": "Internal Use",
+        "effective_from": effective_from,
+        "effective_to": effective_to,
+        "issue_date": issue_date,
+        "review_due": review_date  # typically same as review date
     }
 
 def chunk_text_by_sections(sections_data: List[Tuple[str, int, str]], chunk_size: int = 600, overlap: int = 100) -> List[ParsedChunk]:
@@ -514,6 +556,7 @@ def parse_document(file_path: str, system_id: str = "SYS-MES-001", default_syste
         document_type=doc_type,
         version=meta["version"],
         owner=meta["owner"],
+        approver=meta.get("approver"),
         system_id=system_id,
         review_date=meta["review_date"],
         approval_status=meta["approval_status"],
@@ -524,5 +567,9 @@ def parse_document(file_path: str, system_id: str = "SYS-MES-001", default_syste
         extracted_requirements=reqs,
         extracted_risks=rk_items,
         extracted_gates=gates,
-        structured_audit_questions=structured_questions
+        structured_audit_questions=structured_questions,
+        effective_from=meta.get("effective_from"),
+        effective_to=meta.get("effective_to"),
+        issue_date=meta.get("issue_date"),
+        review_due=meta.get("review_due")
     )

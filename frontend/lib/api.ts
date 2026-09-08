@@ -145,9 +145,9 @@ export const api = {
 
   // Agents & Simulation
   getAgentsHealth: () => fetchJson<any>('/agents/health'),
-  triggerSimulation: (systemId: string = 'SYS-LIMS-001') =>
+  triggerSimulation: (systemId: string = 'SYS-MES-001') =>
     fetchJson<any>(`/simulation/trigger?system_id=${systemId}`, { method: 'POST' }),
-  resetSimulation: (systemId: string = 'SYS-LIMS-001') =>
+  resetSimulation: (systemId: string = 'SYS-MES-001') =>
     fetchJson<any>(`/simulation/reset?system_id=${systemId}`, { method: 'POST' }),
   getSimulationStatus: () => fetchJson<any>('/simulation/status'),
 };

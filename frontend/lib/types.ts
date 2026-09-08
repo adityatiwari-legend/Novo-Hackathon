@@ -316,7 +316,7 @@ export interface CrossDocComparisonItem {
   mes_observed: string;
   mes_citations: string[];
   sop_citations: string[];
-  lims_benchmark_ref?: string;
+
   alignment_status: 'ALIGNED' | 'POTENTIAL_LIFECYCLE_DEVIATION' | 'EVIDENCE_GAP';
   impact: string;
   recommended_action: string;

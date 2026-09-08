@@ -341,7 +341,7 @@ class CrossDocComparisonItem(BaseModel):
     mes_observed: str
     mes_citations: List[str]
     sop_citations: List[str]
-    lims_benchmark_ref: Optional[str] = None
+    benchmark_ref: Optional[str] = None
     alignment_status: str  # ALIGNED, POTENTIAL_LIFECYCLE_DEVIATION, EVIDENCE_GAP
     impact: str
     recommended_action: str

@@ -7,7 +7,7 @@ class ComplianceAgent:
     def __init__(self):
         self.name = "compliance_agent"
 
-    def run(self, db: Session, system_id: str = "SYS-LIMS-001") -> AgentResult:
+    def run(self, db: Session, system_id: str = "SYS-MES-001") -> AgentResult:
         eval_result = compliance_engine.evaluate_system(db, system_id)
         
         citations = []

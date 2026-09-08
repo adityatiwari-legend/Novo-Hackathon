@@ -146,10 +146,10 @@ export default function DocumentsPage() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-slate-800">{doc.id}</span>
-                      <span className="text-[9.5px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded">
-                        v{doc.version || '1.0'}
-                      </span>
+                       <span className="font-mono text-xs font-bold text-slate-800">{doc.id}</span>
+                       <span className="text-[9.5px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded">
+                         v{doc.version || '1.0'}
+                       </span>
                     </div>
 
                     <h3 className="text-xs font-bold text-slate-900 leading-snug">{doc.title}</h3>

@@ -39,7 +39,7 @@ class MockServiceNowConnector:
         self,
         title: str,
         description: str,
-        system_id: str = "SYS-LIMS-001",
+        system_id: str = "SYS-MES-001",
         priority: str = "2 - High",
         assigned_group: str = "QA_Compliance_Systems"
     ) -> Dict[str, Any]:

@@ -16,9 +16,6 @@ if workspace_root not in sys.path:
 from backend.app.core.config import settings
 from backend.app.core.database import Base, engine, SessionLocal
 from backend.app.models.entities import User, GENESIS_HASH, create_audit_log, verify_audit_chain
-from scripts.create_mes_lifecycle_documents import generate_all_mes_documents
-from scripts.ingest_demo_documents import ingest_all_lifecycle_documents
-
 def reset_demo():
     print("============================================================")
     print("Resetting Demo Environment to Clean Pristine State")
@@ -35,14 +32,32 @@ def reset_demo():
     Base.metadata.create_all(bind=engine)
     print("  [+] Dropped and recreated all database tables.")
 
-    # 3. Seed Base Users & System A (SYS-LIMS-001)
-    from scripts.seed_database import seed as seed_lims
-    seed_lims()
-    print("  [+] Seeded System A (SYS-LIMS-001) and baseline demo records.")
+    # 3. Seed Base Users
+    print("[*] Seeding Demo Users...")
+    db = SessionLocal()
+    demo_users = [
+        {"name": "Sarah Jenkins", "email": "owner@demo.local", "role": "SYSTEM_OWNER", "dept": "IT Quality & Validated Systems"},
+        {"name": "Dr. Elena Rostova", "email": "qa@demo.local", "role": "QA_COMPLIANCE", "dept": "Global Quality Assurance"},
+        {"name": "Henrik Lindqvist", "email": "auditor@demo.local", "role": "AUDITOR", "dept": "Regulatory Affairs & Compliance"},
+        {"name": "System Administrator", "email": "admin@demo.local", "role": "ADMIN", "dept": "GxP IT Operations"},
+    ]
+    for u in demo_users:
+        if not db.query(User).filter(User.email == u["email"]).first():
+            user = User(
+                name=u["name"],
+                email=u["email"],
+                role=u["role"],
+                department=u["dept"],
+                permissions=["*"] if u["role"] == "ADMIN" else ["view", "review", "approve"]
+            )
+            db.add(user)
+    db.commit()
+    db.close()
+    print("  [+] Seeded base users.")
 
     # 4. Generate and Ingest authentic MES PAS-X (SYS-MES-001) documents
-    generate_all_mes_documents()
-    ingest_all_lifecycle_documents()
+    from scripts.ingest_pasx import ingest_pasx_documents
+    ingest_pasx_documents()
 
     print("\n[+] Demo reset complete! The environment is ready for presentation.")
 

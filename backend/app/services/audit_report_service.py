@@ -26,6 +26,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from backend.app.core.config import settings
 from backend.app.services.audit_engine import audit_engine
 from backend.app.schemas.domain import AuditAssessmentResponse, CrossDocComparisonResponse
+from backend.app.models.entities import Document
 
 DISCLAIMER_TEXT = (
     "This is a hackathon/training simulation and does not constitute a regulatory audit, "
@@ -41,7 +42,9 @@ class AuditReportService:
         self,
         filepath: str,
         assessment: AuditAssessmentResponse,
-        comparison: CrossDocComparisonResponse
+        comparison: CrossDocComparisonResponse,
+        docs_data: List[List[str]],
+        recs: List[str]
     ):
         doc = SimpleDocTemplate(
             filepath,
@@ -123,7 +126,7 @@ class AuditReportService:
         summary_text = (
             f"An independent audit evaluation was conducted on <b>Novo Life MES PAS-X (SYS-MES-001)</b> using the "
             f"<b>Top 25 Difficult-Auditor GxP IT Checklist (2026)</b>, benchmarked against <b>NN Master IT System Lifecycle SOP "
-            f"(HACK-IT-SOP-001)</b> and the <b>GxP LIMS Lifecycle Documentation Package (LIMS-LCP-001)</b>. "
+            f"(HACK-IT-SOP-001)</b>. "
             f"The calculated <b>Overall Audit Readiness Score is {assessment.readiness_score}%</b>. "
             f"Due to critical incomplete verification activities and unrated residual risks, the formal system release "
             f"recommendation remains: <b>HOLD / DEFER - DO NOT RELEASE TO PRODUCTION</b>."
@@ -180,19 +183,7 @@ class AuditReportService:
 
         # 4. Documents Reviewed
         elements.append(Paragraph("4. Documents Reviewed Across Knowledge Hierarchy", sec_heading))
-        docs_data = [
-            ["Scope", "Document ID", "Title", "Version", "Role / Status"],
-            ["Primary Evidence", "NL-MES-URS-001", "User Requirements Specification", "v1.0", "Draft / Missing QA Approval"],
-            ["Primary Evidence", "NL-MES-MLGP-001", "Master Lifecycle Generation Plan", "v1.0", "Approved (Simulated)"],
-            ["Primary Evidence", "NL-MES-ITRA-001", "IT Risk Assessment Baseline", "v1.0", "Approved (Simulated)"],
-            ["Primary Evidence", "NL-MES-ITRRA-001", "Requirement Risk Assessment", "v1.0", "Residual Risk NOT RATED"],
-            ["Primary Evidence", "NL-MES-IREP-001", "IT Implementation Report", "v1.0", "Gate G5 Blocked / OV Open"],
-            ["Primary Evidence", "NL-MES-ITPSE-001", "Periodic System Evaluation", "v1.0", "HOLD / DEFER Conclusion"],
-            ["Primary Evidence", "NL-MES-SLA-001", "Service Level Agreement", "v0.9", "Pre-Operational / Unactivated"],
-            ["Governance SOP", "HACK-IT-SOP-001", "Manage IT System Lifecycle SOP", "v0.1", "Master Governance Standard"],
-            ["Benchmark Ref", "LIMS-LCP-001", "GxP LIMS Lifecycle Package", "v0.1", "Laboratory Benchmark Ref"],
-            ["Audit Checklist", "CKL-TOP25-2026", "Top 25 Difficult-Auditor Questions", "2026.1", "Master Audit Instrument"]
-        ]
+        # docs_data is passed in
         docs_table = Table(docs_data, colWidths=[90, 95, 175, 45, 135])
         docs_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#002B49")),
@@ -278,12 +269,7 @@ class AuditReportService:
 
         # 11 & 12. Recommendations & Overall Readiness
         elements.append(Paragraph("11 & 12. Corrective Actions Required Prior to Production Release", sec_heading))
-        recs = [
-            "1. <b>Execute Intended-Use Verification (OV / PfV / UAT):</b> Complete qualified test scripts on packaging lines to unblock Gate G5 [NL-MES-IREP-001 p.2].",
-            "2. <b>Conduct Authorized Residual Risk Review:</b> Review and accept the 49 working high risks with the Quality Unit [NL-MES-ITRRA-001 p.3].",
-            "3. <b>Finalize and Authorize Validation Summary Report (VSR):</b> Route the VSR for formal QA sign-off prior to Gate G5 authorization.",
-            "4. <b>Complete Shopfloor Operator Training & SLA Activation:</b> Train 250 packaging line operators and activate 24/7 SLA operational support [NL-MES-SLA-001 p.1]."
-        ]
+        # recs are passed in
         for r in recs:
             elements.append(Paragraph(r, body_style))
             elements.append(Spacer(1, 3))
@@ -304,7 +290,9 @@ class AuditReportService:
         self,
         filepath: str,
         assessment: AuditAssessmentResponse,
-        comparison: CrossDocComparisonResponse
+        comparison: CrossDocComparisonResponse,
+        docs_data: List[List[str]],
+        recs: List[str]
     ):
         doc = DocxDocument()
 
@@ -357,12 +345,18 @@ class AuditReportService:
 
         # 4. Documents Reviewed
         doc.add_heading("4. Documents Reviewed", level=1)
-        doc.add_paragraph(
-            "- Primary Evidence: NL-MES-URS-001, NL-MES-MLGP-001, NL-MES-ITRA-001, NL-MES-ITRRA-001, NL-MES-IREP-001, NL-MES-ITPSE-001, NL-MES-SLA-001\n"
-            "- Governance Standard: NN Master IT System Lifecycle SOP (HACK-IT-SOP-001)\n"
-            "- Reference Benchmark: GxP LIMS Lifecycle Documentation Package (LIMS-LCP-001)\n"
-            "- Audit Instrument: Top 25 Checklists GxP IT Audit Questions 2026 (Top_25_Checklists_GxP_IT_Audit_Questions_2026.xlsx)"
-        )
+        doc.add_paragraph("Dynamic Document List:\n")
+        # docs_data is passed in
+        table = doc.add_table(rows=1, cols=5)
+        table.style = 'Table Grid'
+        hdr_cells = table.rows[0].cells
+        for i, header in enumerate(docs_data[0]):
+            hdr_cells[i].text = header
+            
+        for row_data in docs_data[1:]:
+            row_cells = table.add_row().cells
+            for i, text in enumerate(row_data):
+                row_cells[i].text = str(text)
 
         # 5 & 6. Checklist Results
         doc.add_heading("5 & 6. Question-by-Question Results", level=1)
@@ -401,12 +395,12 @@ class AuditReportService:
 
         # 11 & 12. Recommendations
         doc.add_heading("11 & 12. Corrective Action Plan", level=1)
-        doc.add_paragraph(
-            "1. Complete Intended-Use Verification (OV / PfV / UAT) on commercial packaging line [NL-MES-IREP-001 Section 3.2].\n"
-            "2. Complete Authorized Residual Risk Sign-off for 49 working high requirements with Quality Unit [NL-MES-ITRRA-001 Section 3].\n"
-            "3. Obtain Quality Unit VSR authorization to satisfy Gate G5 requirements [NL-MES-IREP-001 Section 4.3].\n"
-            "4. Deliver packaging operator training to 250 personnel and activate operational SLA [NL-MES-SLA-001 Section 1]."
-        )
+        # recs are passed in
+        # Clean HTML tags for DOCX
+        import re
+        for r in recs:
+            clean_text = re.sub('<[^<]+>', '', r)
+            doc.add_paragraph(clean_text)
 
         # 13 & 14. Limitations & Disclaimer
         doc.add_heading("13 & 14. Limitations & Regulatory Disclaimer", level=1)
@@ -424,6 +418,19 @@ class AuditReportService:
         assessment = audit_engine.get_latest_assessment(db, system_id=system_id)
         comparison = audit_engine.cross_document_comparison(db, system_id=system_id)
 
+        from models import Document
+        docs = db.query(Document).filter(Document.system_id == system_id).all()
+        docs_data = [["Scope", "Document ID", "Title", "Version", "Role / Status"]]
+        for d in docs:
+            docs_data.append(["Primary Evidence", d.document_id, d.title, f"v{d.version}" if d.version else "v1.0", d.status])
+        # docs_data is passed in
+        
+        recs = []
+        for i, c in enumerate(comparison.items):
+            recs.append(f"{i+1}. <b>{c.topic}:</b> {c.recommended_action}")
+        if not recs:
+            recs = ["No corrective actions required."]
+        
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         pdf_name = f"GxP_IT_Audit_Report_{system_id}_{timestamp}.pdf"
         docx_name = f"GxP_IT_Audit_Report_{system_id}_{timestamp}.docx"
@@ -431,8 +438,8 @@ class AuditReportService:
         pdf_path = os.path.join(self.output_dir, pdf_name)
         docx_path = os.path.join(self.output_dir, docx_name)
 
-        self.generate_pdf_report(pdf_path, assessment, comparison)
-        self.generate_docx_report(docx_path, assessment, comparison)
+        self.generate_pdf_report(pdf_path, assessment, comparison, docs_data, recs)
+        self.generate_docx_report(docx_path, assessment, comparison, docs_data, recs)
 
         return {
             "success": True,
