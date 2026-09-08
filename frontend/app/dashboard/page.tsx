@@ -56,8 +56,8 @@ export default function DashboardPage() {
     );
   }
 
-  const score = data?.readiness_score ?? 64.6;
-  const isHold = data?.release_recommendation?.includes('HOLD') || score < 95;
+  const score = data?.readiness_score;
+  const isHold = data?.release_recommendation?.includes('HOLD') || (score !== undefined && score < 95);
   const filteredFindings = findings.filter(f =>
     severityFilter === 'ALL' || f.severity?.toUpperCase() === severityFilter
   );
@@ -75,7 +75,7 @@ export default function DashboardPage() {
             <span className="text-blue-700 font-semibold">Continuous Assurance Dashboard</span>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1">
-            {data?.system_name || 'Novo Life MES PAS-X'}
+            {data?.system_name || 'Validated System'}
           </h1>
         </div>
 
@@ -126,8 +126,8 @@ export default function DashboardPage() {
                       d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                     />
                     <path
-                      className={score >= 80 ? 'text-amber-500' : 'text-rose-600'}
-                      strokeDasharray={`${score}, 100`}
+                      className={score !== undefined && score >= 80 ? 'text-amber-500' : 'text-rose-600'}
+                      strokeDasharray={`${score ?? 0}, 100`}
                       strokeWidth="3.5"
                       strokeLinecap="round"
                       stroke="currentColor"
@@ -137,7 +137,7 @@ export default function DashboardPage() {
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                     <span className="text-2xl font-black text-slate-900 tabular-nums leading-none">
-                      {Math.round(score)}%
+                      {score !== undefined ? `${Math.round(score)}%` : '--'}
                     </span>
                     <span className="text-[9px] text-slate-400 font-mono mt-0.5">SCORE</span>
                   </div>
@@ -145,13 +145,15 @@ export default function DashboardPage() {
 
                 <div className="space-y-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                    <span className={`w-2 h-2 rounded-full ${isHold ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`}></span>
                     <span className="text-xs font-bold text-rose-700 uppercase tracking-wide">
-                      {data?.release_recommendation || 'HOLD / DEFER - DO NOT RELEASE'}
+                      {data?.release_recommendation || 'EVALUATION PENDING'}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-600 leading-snug">
-                    Deterministic gate G5 blocks production release until residual risks and verification gaps are resolved.
+                    {data?.blocked_gates_count !== undefined && data.blocked_gates_count > 0
+                      ? 'Deterministic release gates block production release until residual risks and verification gaps are resolved.'
+                      : data?.release_recommendation || 'System readiness evaluation pending.'}
                   </p>
                 </div>
               </div>
@@ -159,7 +161,7 @@ export default function DashboardPage() {
 
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
               <span>Lifecycle: <b className="text-slate-700">{data?.lifecycle_status || 'PRE-OPERATIONAL'}</b></span>
-              <span className="font-mono text-[10px]">Conf: 95%</span>
+              <span className="font-mono text-[10px]">Deterministic GAMP 5</span>
             </div>
           </div>
 
@@ -170,39 +172,77 @@ export default function DashboardPage() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 font-mono">
                   Primary Release Blocker Analysis
                 </span>
-                <span className="text-xs text-rose-700 bg-rose-50 border border-rose-200 font-semibold px-2 py-0.5 rounded">
-                  4 Critical Gate Findings
-                </span>
+                {data?.blocked_gates_count !== undefined ? (
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${
+                    data.blocked_gates_count > 0
+                      ? 'text-rose-700 bg-rose-50 border-rose-200'
+                      : 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                  }`}>
+                    {data.blocked_gates_count > 0
+                      ? `${data.blocked_gates_count} Gate Blockers`
+                      : '0 Gate Blockers'}
+                  </span>
+                ) : (
+                  <span className="text-xs text-slate-500 bg-slate-50 border border-slate-200 font-semibold px-2 py-0.5 rounded">
+                    Evaluation Pending
+                  </span>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="bg-rose-50/50 border border-rose-200/80 rounded-xl p-3 space-y-1">
                   <div className="flex items-center gap-1.5 text-rose-800 font-bold text-xs">
                     <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                    <span>Gate G5 Blocked</span>
+                    <span>
+                      {data?.blocked_gates_count !== undefined
+                        ? data.blocked_gates_count > 0
+                          ? `${data.blocked_gates_count} Blocked Gate${data.blocked_gates_count > 1 ? 's' : ''}`
+                          : 'Gates Clear'
+                        : 'Release Gate Status'}
+                    </span>
                   </div>
                   <p className="text-[11px] text-slate-700 leading-snug">
-                    Release Readiness gate failed due to incomplete operational handover and unmitigated high risks.
+                    {data?.blocked_gates_summary && data.blocked_gates_summary.length > 0
+                      ? data.blocked_gates_summary.slice(0, 2).join('; ')
+                      : data?.blocked_gates_count === 0
+                      ? 'All evaluated release gates passed qualification criteria.'
+                      : 'Deterministic release gate status unavailable.'}
                   </p>
                 </div>
 
                 <div className="bg-amber-50/50 border border-amber-200/80 rounded-xl p-3 space-y-1">
                   <div className="flex items-center gap-1.5 text-amber-800 font-bold text-xs">
                     <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span>Verification Gaps</span>
+                    <span>
+                      {data?.unverified_requirements_count !== undefined
+                        ? data.unverified_requirements_count > 0
+                          ? 'Verification Gaps'
+                          : 'Requirements Verified'
+                        : 'Verification Status'}
+                    </span>
                   </div>
                   <p className="text-[11px] text-slate-700 leading-snug">
-                    9 of 50 URS requirements lack direct test script execution records in PAS-X qualification package.
+                    {data?.requirements_count !== undefined && data?.unverified_requirements_count !== undefined
+                      ? `${data.unverified_requirements_count} of ${data.requirements_count} URS requirements lack direct test execution records in qualification package.`
+                      : 'Requirement qualification records unavailable.'}
                   </p>
                 </div>
 
                 <div className="bg-purple-50/50 border border-purple-200/80 rounded-xl p-3 space-y-1">
                   <div className="flex items-center gap-1.5 text-purple-800 font-bold text-xs">
                     <ShieldAlert className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                    <span>Residual Risks Open</span>
+                    <span>
+                      {data?.high_critical_risks !== undefined
+                        ? data.high_critical_risks > 0
+                          ? 'Residual Risks Open'
+                          : 'Risks Mitigated'
+                        : 'Risk Posture'}
+                    </span>
                   </div>
                   <p className="text-[11px] text-slate-700 leading-snug">
-                    25 high working risks in ICH Q9 register require verified mitigation before Gate G6 approval.
+                    {data?.high_critical_risks !== undefined
+                      ? `${data.high_critical_risks} high working risks in ICH Q9 register require verified mitigation before Gate G6 approval.`
+                      : 'ICH Q9 risk assessment telemetry unavailable.'}
                   </p>
                 </div>
               </div>
@@ -212,19 +252,27 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100">
               <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
                 <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">Requirements</span>
-                <span className="text-lg font-bold text-slate-900 tabular-nums">50 Traced</span>
+                <span className="text-lg font-bold text-slate-900 tabular-nums">
+                  {data?.requirements_count !== undefined ? `${data.requirements_count} Traced` : 'Unavailable'}
+                </span>
               </div>
               <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
                 <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">Hazards Evaluated</span>
-                <span className="text-lg font-bold text-slate-900 tabular-nums">26 Risks</span>
+                <span className="text-lg font-bold text-slate-900 tabular-nums">
+                  {data?.risks_count !== undefined ? `${data.risks_count} Risks` : 'Unavailable'}
+                </span>
               </div>
               <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
                 <span className="text-[10px] uppercase font-bold text-rose-600 font-mono block">Open Findings</span>
-                <span className="text-lg font-bold text-rose-700 tabular-nums">{data?.open_findings ?? 7} Blockers</span>
+                <span className="text-lg font-bold text-rose-700 tabular-nums">
+                  {data?.open_findings !== undefined ? `${data.open_findings} Blockers` : 'Unavailable'}
+                </span>
               </div>
               <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
                 <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">Pending QA</span>
-                <span className="text-lg font-bold text-amber-600 tabular-nums">{data?.pending_approvals ?? 1} Approvals</span>
+                <span className="text-lg font-bold text-amber-600 tabular-nums">
+                  {data?.pending_approvals !== undefined ? `${data.pending_approvals} Approvals` : 'Unavailable'}
+                </span>
               </div>
             </div>
           </div>
@@ -368,7 +416,7 @@ export default function DashboardPage() {
 
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1">
                       <span className="font-mono text-[10px] text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded truncate max-w-xs">
-                        {f.source_citations?.[0]?.document ? String(f.source_citations[0].document) : 'NL-MES-ITPSE-001'}
+                        {f.source_citations?.[0]?.document ? String(f.source_citations[0].document) : 'Citation Pending'}
                       </span>
                       <Link
                         href="/compliance"
@@ -402,7 +450,9 @@ export default function DashboardPage() {
                 <p className="text-xs text-slate-500">Continuous evaluation telemetry trend</p>
               </div>
               <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                +14.6% Trend
+                {data?.readiness_trend && data.readiness_trend.length >= 2
+                  ? `${(data.readiness_trend[data.readiness_trend.length - 1].score - data.readiness_trend[0].score) >= 0 ? '+' : ''}${(data.readiness_trend[data.readiness_trend.length - 1].score - data.readiness_trend[0].score).toFixed(1)}% Trend`
+                  : 'Deterministic'}
               </span>
             </div>
 
@@ -453,29 +503,26 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-2 text-xs">
-              {[
-                { name: 'Compliance Engine', status: 'Evaluated 42 Rules', state: 'Passed', icon: ShieldCheck },
-                { name: 'Traceability Agent', status: '50 Requirements Traced', state: 'Active', icon: Layers },
-                { name: 'Risk Agent', status: 'ICH Q9 Matrix Evaluated', state: 'Active', icon: AlertTriangle },
-                { name: 'Release Gate Engine', status: 'G1–G6 Evaluated (G5 Blocked)', state: 'Enforced', icon: Lock },
-                { name: 'Evidence Agent', status: 'PDF/DOCX Dossier Ready', state: 'Ready', icon: FileCheck },
-              ].map((agent, i) => {
-                const Icon = agent.icon;
-                return (
+              {data?.agent_health ? (
+                Object.entries(data.agent_health).map(([agentName, agentStatus], i) => (
                   <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100">
                     <div className="flex items-center gap-2">
-                      <Icon className="w-3.5 h-3.5 text-blue-600" />
+                      <Cpu className="w-3.5 h-3.5 text-blue-600" />
                       <div>
-                        <span className="font-semibold text-slate-800 text-xs block">{agent.name}</span>
-                        <span className="text-[10px] text-slate-400">{agent.status}</span>
+                        <span className="font-semibold text-slate-800 text-xs block">{agentName}</span>
+                        <span className="text-[10px] text-slate-400">{agentStatus}</span>
                       </div>
                     </div>
                     <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded font-mono">
-                      {agent.state}
+                      Active
                     </span>
                   </div>
-                );
-              })}
+                ))
+              ) : (
+                <div className="p-3 bg-slate-50 rounded-lg text-slate-500 text-center">
+                  Agent mesh telemetry unavailable
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from backend.app.models.entities import Requirement, Risk, Document, ComplianceFinding
 from backend.app.services.graph_service import get_requirement_trace
 
+_UNSET = object()
+
 class TraceabilityEngine:
     """
     Builds the bidirectional GxP traceability graph and detects compliance gaps.
@@ -23,25 +25,37 @@ class TraceabilityEngine:
             if not trace:
                 trace = {}
             
-            risk_ref = req.risk_reference or "RSK-MES-001"
-            risk_obj = db.query(Risk).filter(Risk.id == risk_ref).first()
-            risk_level = risk_obj.risk_level if risk_obj else ("MEDIUM" if req.requirement_id == "URS-028" else "HIGH")
+            # Risk relationship: derived strictly from req.risk_reference, never manufactured
+            risk_ref = req.risk_reference
+            risk_obj = None
+            if risk_ref:
+                risk_obj = db.query(Risk).filter(Risk.id == risk_ref).first()
             
-            # Simple check if there are tests in trace
+            risk_id = risk_ref if risk_ref else "NOT_EVIDENCED"
+            risk_level = risk_obj.risk_level if risk_obj else "NOT_EVIDENCED"
+            
+            # Functional specification module: query trace/relationships, never manufacture FS-MOD-xxx
+            fs_nodes = [node for node in trace.get("related_nodes", []) if node.get("type") in ("FUNCTIONAL_SPEC", "FS_MODULE")]
+            fs_module = fs_nodes[0].get("id") if fs_nodes else "NOT_EVIDENCED"
+            
+            # Verification reference and status: derived strictly from req and verified tests
             tests = [node for node in trace.get("related_nodes", []) if node.get("type") == "TEST_CASE"]
-            test_status = "COMPLETE" if tests else "NOT_PERFORMED"
-            if req.requirement_id in ["URS-009", "URS-010", "URS-030"]:
+            if req.status == "VERIFIED" or (tests and any(t.get("status") in ("VERIFIED", "PASSED", "MET") for t in tests)):
                 test_status = "COMPLETE"
+            else:
+                test_status = "NOT_PERFORMED"
                 
+            verification_id = req.verification_reference if req.verification_reference else "NOT_EVIDENCED"
+            
             matrix.append({
                 "requirement_id": req.requirement_id,
                 "requirement_text": req.text,
                 "type": req.type,
-                "fs_module": f"FS-MOD-{req.requirement_id[-3:]}",
-                "risk_id": risk_ref,
+                "fs_module": fs_module,
+                "risk_id": risk_id,
                 "risk_level": risk_level,
-                "residual_risk_state": "NOT RATED / UNACCEPTED",
-                "verification_id": req.verification_reference or f"VR-MES-{req.requirement_id[-3:]}",
+                "residual_risk_state": "NOT RATED / UNACCEPTED" if risk_level != "NOT_EVIDENCED" else "NOT_EVIDENCED",
+                "verification_id": verification_id,
                 "verification_status": test_status,
                 "implementation_status": "COMPLETE" if test_status == "COMPLETE" else "NOT_MET",
                 "release_blocker": test_status != "COMPLETE",
@@ -52,7 +66,7 @@ class TraceabilityEngine:
             
         return matrix
 
-    def detect_traceability_gaps(self, db: Session, system_id: str = "SYS-MES-001") -> List[Dict[str, Any]]:
+    def detect_traceability_gaps(self, db: Session, system_id: str = "SYS-MES-001", risk_threshold: Any = _UNSET) -> List[Dict[str, Any]]:
         matrix = self.build_traceability_matrix(db, system_id)
         gaps = []
 
@@ -71,20 +85,43 @@ class TraceabilityEngine:
                 "affected_items": [m["requirement_id"] for m in unverified]
             })
 
-        from backend.app.models.entities import Risk
-        unrated_risks = db.query(Risk).filter(Risk.system_id == system_id, Risk.score >= 10).all()
-        if unrated_risks:
-            source_docs = list(set([r.source_document_id for r in unrated_risks if r.source_document_id]))
+        if risk_threshold is _UNSET:
+            from backend.app.services.audit_engine import CORE_25_AUDIT_SPECS
+            da03_spec = next((s for s in CORE_25_AUDIT_SPECS if s.get("q_id") == "DA-03-005"), None)
+            if da03_spec and "rule_parameters" in da03_spec and "risk_threshold" in da03_spec["rule_parameters"]:
+                effective_threshold = da03_spec["rule_parameters"]["risk_threshold"]
+            else:
+                effective_threshold = None
+        else:
+            effective_threshold = risk_threshold
+
+        if effective_threshold is not None:
+            from backend.app.models.entities import Risk
+            unrated_risks = db.query(Risk).filter(Risk.system_id == system_id, Risk.score >= effective_threshold).all()
+            if unrated_risks:
+                source_docs = list(set([r.source_document_id for r in unrated_risks if r.source_document_id]))
+                gaps.append({
+                    "gap_code": f"GAP-TRC-{len(gaps)+1:03d}",
+                    "title": "Residual Risk Not Rated or Accepted by Quality Unit",
+                    "description": f"{len(unrated_risks)} requirements remain with residual risk unmitigated (score >= {effective_threshold}) without formal Quality Unit acceptance.",
+                    "severity": "CRITICAL",
+                    "source_document": source_docs[0] if source_docs else "Unknown",
+                    "source_section": "Residual Risk Evaluation",
+                    "source_page": "Unknown",
+                    "affected_count": len(unrated_risks),
+                    "affected_items": [r.id for r in unrated_risks]
+                })
+        else:
             gaps.append({
                 "gap_code": f"GAP-TRC-{len(gaps)+1:03d}",
-                "title": "Residual Risk Not Rated or Accepted by Quality Unit",
-                "description": f"{len(unrated_risks)} requirements remain with residual risk unmitigated without formal Quality Unit acceptance.",
-                "severity": "CRITICAL",
-                "source_document": source_docs[0] if source_docs else "Unknown",
-                "source_section": "Residual Risk Evaluation",
+                "title": "Residual Risk Evaluation NOT_EVALUABLE (Unconfigured Threshold)",
+                "description": "Risk threshold parameter is missing in system audit configuration. Cannot evaluate residual risks.",
+                "severity": "HIGH",
+                "source_document": "System Configuration",
+                "source_section": "Risk Configuration",
                 "source_page": "Unknown",
-                "affected_count": len(unrated_risks),
-                "affected_items": [r.id for r in unrated_risks]
+                "affected_count": 0,
+                "affected_items": []
             })
 
         from backend.app.models.entities import ReleaseGate

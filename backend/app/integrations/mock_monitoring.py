@@ -27,7 +27,7 @@ class ContinuousComplianceMonitor:
         doc_title = doc.title if doc else "SOP_Document_Management.docx"
         
         sys = db.query(System).filter(System.id == system_id).first()
-        initial_score = sys.readiness_score if sys else 82
+        initial_score = sys.readiness_score if (sys and sys.readiness_score is not None) else compliance_engine.evaluate_system(db, system_id)["readiness_score"]
 
         if doc:
             doc.status = "Overdue"
@@ -85,6 +85,7 @@ class ContinuousComplianceMonitor:
             entity_id=doc.id if doc else "DOC-SOP-DM-001",
             details={
                 "event": "SOP_PERIODIC_REVIEW_OVERDUE",
+                "is_simulated": True,
                 "document": doc_title,
                 "previous_readiness": initial_score,
                 "new_readiness": new_score,

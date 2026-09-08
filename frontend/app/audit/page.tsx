@@ -204,7 +204,7 @@ export default function AuditPage() {
                 </span>
                 <div className="flex items-baseline gap-2 mt-1">
                   <span className="text-3xl font-black text-[#002B49] tabular-nums">
-                    {assessment?.readiness_score ?? 64.6}%
+                    {assessment?.readiness_score !== undefined ? `${assessment.readiness_score}%` : 'Unavailable'}
                   </span>
                   <span className="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 font-mono">
                     HOLD / DEFER
@@ -214,38 +214,52 @@ export default function AuditPage() {
               <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
                 <div
                   className="bg-blue-600 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${assessment?.readiness_score ?? 64.6}%` }}
+                  style={{ width: `${assessment?.readiness_score ?? 0}%` }}
                 />
               </div>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">Total Questions</span>
-              <p className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">{assessment?.total_questions ?? 25}</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">
+                {assessment?.total_questions !== undefined ? assessment.total_questions : 'Unavailable'}
+              </p>
               <span className="text-[10px] text-slate-500">Curated Core Subset</span>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-emerald-100 shadow-xs bg-emerald-50/30">
               <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider font-mono">Passed</span>
-              <p className="text-2xl font-bold text-emerald-700 mt-1 tabular-nums">{assessment?.passed_count ?? 15}</p>
-              <span className="text-[10px] text-emerald-600 font-semibold">60% compliant</span>
+              <p className="text-2xl font-bold text-emerald-700 mt-1 tabular-nums">
+                {assessment?.passed_count !== undefined ? assessment.passed_count : 'Unavailable'}
+              </p>
+              <span className="text-[10px] text-emerald-600 font-semibold">
+                {assessment?.total_questions && assessment?.passed_count !== undefined
+                  ? `${Math.round((assessment.passed_count / assessment.total_questions) * 100)}% compliant`
+                  : 'Compliance Pending'}
+              </span>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-amber-100 shadow-xs bg-amber-50/30">
               <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider font-mono">Partial</span>
-              <p className="text-2xl font-bold text-amber-700 mt-1 tabular-nums">{assessment?.partial_count ?? 4}</p>
+              <p className="text-2xl font-bold text-amber-700 mt-1 tabular-nums">
+                {assessment?.partial_count !== undefined ? assessment.partial_count : 'Unavailable'}
+              </p>
               <span className="text-[10px] text-amber-600 font-semibold">Mitigation required</span>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-rose-100 shadow-xs bg-rose-50/30">
               <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider font-mono">Failed</span>
-              <p className="text-2xl font-bold text-rose-700 mt-1 tabular-nums">{assessment?.failed_count ?? 6}</p>
+              <p className="text-2xl font-bold text-rose-700 mt-1 tabular-nums">
+                {assessment?.failed_count !== undefined ? assessment.failed_count : 'Unavailable'}
+              </p>
               <span className="text-[10px] text-rose-600 font-semibold">Release blockers</span>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-purple-100 shadow-xs bg-purple-50/30">
               <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider font-mono">Critical</span>
-              <p className="text-2xl font-bold text-purple-700 mt-1 tabular-nums">{assessment?.critical_findings_count ?? 4}</p>
+              <p className="text-2xl font-bold text-purple-700 mt-1 tabular-nums">
+                {assessment?.critical_findings_count !== undefined ? assessment.critical_findings_count : 'Unavailable'}
+              </p>
               <span className="text-[10px] text-purple-600 font-semibold">Gate G5 blocked</span>
             </div>
           </div>
@@ -254,13 +268,16 @@ export default function AuditPage() {
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-bold text-slate-500 font-mono mr-1">Filter:</span>
-              {[
-                { label: 'All (25)', val: 'ALL' },
-                { label: 'Failed (6)', val: 'FAIL', color: 'text-rose-700 bg-rose-50 border-rose-200' },
-                { label: 'Critical Only', val: 'CRITICAL', color: 'text-purple-700 bg-purple-50 border-purple-200' },
-                { label: 'Partial (4)', val: 'PARTIAL', color: 'text-amber-700 bg-amber-50 border-amber-200' },
-                { label: 'Passed (15)', val: 'PASS', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-              ].map(f => (
+              {(() => {
+                const allItems = assessment?.items || [];
+                return [
+                  { label: `All (${allItems.length})`, val: 'ALL' },
+                  { label: `Failed (${allItems.filter(i => i.status === 'FAIL').length})`, val: 'FAIL', color: 'text-rose-700 bg-rose-50 border-rose-200' },
+                  { label: 'Critical Only', val: 'CRITICAL', color: 'text-purple-700 bg-purple-50 border-purple-200' },
+                  { label: `Partial (${allItems.filter(i => i.status === 'PARTIAL').length})`, val: 'PARTIAL', color: 'text-amber-700 bg-amber-50 border-amber-200' },
+                  { label: `Passed (${allItems.filter(i => i.status === 'PASS').length})`, val: 'PASS', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+                ];
+              })().map(f => (
                 <button
                   key={f.val}
                   onClick={() => setFilterResult(f.val)}
@@ -475,10 +492,10 @@ export default function AuditPage() {
 
             <div className="flex items-center gap-3">
               <span className="text-xs bg-rose-50 text-rose-800 border border-rose-200 font-semibold px-2.5 py-1 rounded-lg">
-                Deviations: {comparison?.deviations_count ?? 3}
+                Deviations: {comparison?.deviations_count !== undefined ? comparison.deviations_count : 'Unavailable'}
               </span>
               <span className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold px-2.5 py-1 rounded-lg">
-                Aligned Controls: {comparison?.aligned_count ?? 2}
+                Aligned Controls: {comparison?.aligned_count !== undefined ? comparison.aligned_count : 'Unavailable'}
               </span>
             </div>
           </div>
@@ -550,10 +567,25 @@ export default function AuditPage() {
                   </div>
 
                   {/* Benchmark & Corrective Action */}
-                  <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 text-xs space-y-1">
+                  <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 text-xs space-y-2">
                     <p className="font-bold text-blue-900">
                       Recommended Action: <span className="font-normal text-slate-800">{item.recommended_action}</span>
                     </p>
+                    {(item.source_locator || item.target_locator) && (
+                      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-blue-100 text-[10px] font-mono text-slate-600">
+                        <span className="font-bold text-blue-800">Bi-directional Provenance:</span>
+                        {item.source_document_id && (
+                          <span className="bg-white px-1.5 py-0.5 rounded border border-blue-200">
+                            SOP: {item.source_document_id} {item.source_locator ? `(${item.source_locator})` : ''}
+                          </span>
+                        )}
+                        {item.target_document_id && (
+                          <span className="bg-white px-1.5 py-0.5 rounded border border-blue-200">
+                            MES: {item.target_document_id} {item.target_locator ? `(${item.target_locator})` : ''}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

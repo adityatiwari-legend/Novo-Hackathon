@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
 from backend.app.models.entities import (
-    System, Document, ComplianceFinding, Risk, Recommendation, EvidencePack, Workflow, ReleaseGate, AuditAssessment
+    System, Document, ComplianceFinding, Risk, Recommendation, EvidencePack, Workflow, ReleaseGate, AuditAssessment, Requirement
 )
 from backend.app.schemas.domain import DashboardOverview, SystemResponse
 from backend.app.services.compliance_engine import compliance_engine
@@ -114,6 +114,21 @@ def get_dashboard(system_id: Optional[str] = None, db: Session = Depends(get_db)
         "Evidence Agent": "Healthy (PDF/DOCX)",
         "Recommendation Agent": "Healthy (HITL Gate)"
     }
+    requirements_count = db.query(Requirement).filter(Requirement.system_id == system_id).count()
+    verified_requirements_count = db.query(Requirement).filter(
+        Requirement.system_id == system_id,
+        Requirement.status == "VERIFIED"
+    ).count()
+    unverified_requirements_count = requirements_count - verified_requirements_count
+    
+    risks_count = db.query(Risk).filter(Risk.system_id == system_id).count()
+    
+    gates_list = gate_res.get("gates", [])
+    blocked_gates_summary = [
+        f"Gate {g.get('gate_code')}: {g.get('blocking_reason') or g.get('status')}"
+        for g in gates_list if g.get("status") in ("NOT MET", "BLOCKED")
+    ]
+    blocked_gates_count = len(blocked_gates_summary)
 
     return DashboardOverview(
         system_name=system.name,
@@ -130,7 +145,13 @@ def get_dashboard(system_id: Optional[str] = None, db: Session = Depends(get_db)
         readiness_trend=readiness_trend,
         findings_by_severity=findings_by_severity,
         systems_summary=systems_summary,
-        agent_health=agent_health
+        agent_health=agent_health,
+        requirements_count=requirements_count,
+        verified_requirements_count=verified_requirements_count,
+        unverified_requirements_count=unverified_requirements_count,
+        risks_count=risks_count,
+        blocked_gates_count=blocked_gates_count,
+        blocked_gates_summary=blocked_gates_summary
     )
 
 @router.get("/systems", response_model=List[SystemResponse])

@@ -188,6 +188,24 @@ class ReleaseGate(Base):
     prerequisites = Column(Text, nullable=True)
     created_at = Column(DateTime, default=get_utc_now)
 
+class TrainingRecord(Base):
+    __tablename__ = "training_records"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    system_id = Column(String(50), nullable=False, index=True)
+    curriculum_id = Column(String(100), nullable=False, index=True)
+    role_name = Column(String(100), nullable=False, index=True)
+    required_count = Column(Integer, nullable=False, default=0)
+    completed_count = Column(Integer, nullable=False, default=0)
+    status = Column(String(50), default="NOT_STARTED")  # COMPLETED, IN_PROGRESS, NOT_STARTED, CONFLICT
+    effective_from = Column(DateTime, nullable=True)
+    effective_to = Column(DateTime, nullable=True)
+    source_document_id = Column(String(36), nullable=True)
+    evidence_id = Column(String(36), nullable=True)
+    locator = Column(String(255), nullable=True)
+    recorded_at = Column(DateTime, default=get_utc_now)
+    created_at = Column(DateTime, default=get_utc_now)
+
 class ComplianceCheck(Base):
     __tablename__ = "compliance_checks"
     

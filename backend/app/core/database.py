@@ -1,14 +1,21 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from backend.app.core.config import settings
 
 # Configure SQLite or PostgreSQL
+db_url = settings.DATABASE_URL
 connect_args = {}
-if settings.DATABASE_URL.startswith("sqlite"):
+if db_url.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
+    if "gxp_copilot.db" in db_url:
+        root_db = os.path.join(settings.WORKSPACE_ROOT, "gxp_copilot.db")
+        if os.path.exists(root_db):
+            normalized_path = root_db.replace("\\", "/")
+            db_url = f"sqlite:///{normalized_path}"
 
 engine = create_engine(
-    settings.DATABASE_URL,
+    db_url,
     connect_args=connect_args,
     echo=False
 )

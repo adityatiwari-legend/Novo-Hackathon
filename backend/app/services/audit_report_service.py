@@ -418,7 +418,7 @@ class AuditReportService:
         assessment = audit_engine.get_latest_assessment(db, system_id=system_id)
         comparison = audit_engine.cross_document_comparison(db, system_id=system_id)
 
-        from models import Document
+        from backend.app.models.entities import Document
         docs = db.query(Document).filter(Document.system_id == system_id).all()
         docs_data = [["Scope", "Document ID", "Title", "Version", "Role / Status"]]
         for d in docs:

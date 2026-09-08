@@ -83,6 +83,7 @@ CORE_25_AUDIT_SPECS = [
         "weight": 20,
         "expected_evidence": "Formal residual risk assessment, signed risk acceptance matrix, QA Unit approval.",
         "check_type": "RESIDUAL_RISK_ACCEPTED",
+        "rule_parameters": {"risk_threshold": 10}
     },
     {
         "seq": 6,
@@ -589,7 +590,7 @@ class AuditEngine:
                 
         elif check_type == "RESIDUAL_RISK_ACCEPTED":
             if "risk_threshold" not in rule_params:
-                return ("NOT_EVALUABLE", "Missing", 0.0, [], "Rule configuration error: missing risk_threshold", "Missing risk threshold config", severity, "Configure risk_threshold")
+                return ("NOT_EVALUABLE", "Missing", 0.0, [], "Rule configuration error: missing risk_threshold in rule_parameters", "Missing risk threshold configuration", severity, "Configure explicit risk_threshold")
             threshold = rule_params["risk_threshold"]
             high_risks = db.query(Risk).filter(
                 Risk.system_id == system_id,
@@ -597,13 +598,14 @@ class AuditEngine:
             ).all()
             if high_risks:
                 status = "FAIL"
-                gap = f"Found {len(high_risks)} unmitigated risks above threshold."
-                observed = f"Residual risk is unrated or unapproved for {len(high_risks)} items."
+                gap = f"Found {len(high_risks)} unmitigated risks at or above threshold {threshold}."
+                observed = f"Residual risk is unrated or unapproved for {len(high_risks)} items (threshold={threshold})."
                 evidence_quality = "Missing"
-                citations.append(f"[Risk Register | {len(high_risks)} open items]")
+                for r in high_risks[:3]:
+                    citations.append(f"[{r.id} | score:{r.score} | doc:{r.source_document_id or 'N/A'} | ev:{r.evidence_id or 'N/A'}]")
             else:
                 status = "PASS"
-                observed = "All high risks are mitigated or accepted."
+                observed = f"All risks below threshold {threshold} or mitigated/accepted."
                 gap = None
                 evidence_quality = "Found"
                 
@@ -649,46 +651,84 @@ class AuditEngine:
                 evidence_quality = "Found"
         
         elif check_type == "TRAINING_COMPLETE":
-            import re
-            training_evidence = db.query(EvidenceItem).filter(
-                EvidenceItem.text.ilike("%operators trained%")
-            ).first()
-            if not training_evidence:
+            from backend.app.models.entities import TrainingRecord
+            as_of_date = rule_params.get("as_of_date")
+            query = db.query(TrainingRecord).filter(TrainingRecord.system_id == system_id)
+            if as_of_date:
+                query = query.filter(
+                    TrainingRecord.effective_from <= as_of_date,
+                    (TrainingRecord.effective_to == None) | (TrainingRecord.effective_to >= as_of_date)
+                )
+            training_records = query.all()
+            
+            if not training_records:
                 status = "NOT_EVIDENCED"
-                observed = "No training evidence found."
-                gap = "Missing evidence of training completion."
+                observed = "No structured training qualification facts evidenced for system roles."
+                gap = "Missing verified training execution records."
                 evidence_quality = "Missing"
             else:
-                text = training_evidence.text
-                citations.append(f"[{training_evidence.document_id}]")
-                match = re.search(r'(\d+)\s*of\s*(\d+)', text)
-                if match:
-                    trained = int(match.group(1))
-                    required = int(match.group(2))
-                    observed = f"Structured facts: trained_count={trained}, required_count={required}."
-                    if required > 0:
-                        coverage = trained / required
-                        if coverage == 1.0:
+                # Group by role_name and curriculum_id to handle duplicates and detect conflicts
+                grouped = {}
+                for r in training_records:
+                    k = (r.role_name, r.curriculum_id)
+                    grouped.setdefault(k, []).append(r)
+                
+                has_conflict = False
+                active_records = []
+                for k, recs in grouped.items():
+                    req_counts = set(r.required_count for r in recs)
+                    comp_counts = set(r.completed_count for r in recs)
+                    # Conflicting counts across records for same role/curriculum
+                    if len(req_counts) > 1 or len(comp_counts) > 1:
+                        has_conflict = True
+                        break
+                    rec = sorted(recs, key=lambda x: x.recorded_at or x.created_at, reverse=True)[0]
+                    # Invalid/contradictory counts (e.g. required <= 0 with completions, or negative values)
+                    if (rec.required_count <= 0 and rec.completed_count > 0) or rec.required_count < 0 or rec.completed_count < 0:
+                        has_conflict = True
+                        break
+                    if rec.status == "CONFLICT":
+                        has_conflict = True
+                        break
+                    active_records.append(rec)
+                
+                if has_conflict:
+                    status = "CONFLICT"
+                    observed = "Contradictory or invalid training metrics detected across qualification records."
+                    gap = "Conflicting training facts."
+                    evidence_quality = "Conflicting"
+                    for r in training_records[:3]:
+                        eff = r.effective_from.strftime("%Y-%m-%d") if r.effective_from else "N/A"
+                        citations.append(f"[{r.curriculum_id} | role:{r.role_name} | doc:{r.source_document_id or 'N/A'} | ev:{r.evidence_id or 'N/A'} | eff:{eff}]")
+                else:
+                    total_required = sum(r.required_count for r in active_records)
+                    total_completed = sum(r.completed_count for r in active_records)
+                    
+                    for r in active_records:
+                        eff = r.effective_from.strftime("%Y-%m-%d") if r.effective_from else "N/A"
+                        citations.append(f"[{r.curriculum_id} | role:{r.role_name} | doc:{r.source_document_id or 'N/A'} | ev:{r.evidence_id or 'N/A'} | loc:{r.locator or 'N/A'} | eff:{eff}]")
+                    
+                    if total_required > 0:
+                        if total_completed >= total_required and all(r.completed_count >= r.required_count for r in active_records):
                             status = "PASS"
+                            observed = f"All required personnel qualified ({total_completed}/{total_required} across {len(active_records)} roles)."
                             gap = None
                             evidence_quality = "Found"
-                        elif coverage == 0.0:
+                        elif total_completed == 0:
                             status = "FAIL"
-                            gap = "Verified zero coverage."
-                            evidence_quality = "Conflicting"
+                            observed = f"Zero personnel qualified out of {total_required} required across {len(active_records)} roles."
+                            gap = "No qualified personnel evidenced for system operation."
+                            evidence_quality = "Found"
                         else:
                             status = "PARTIAL"
-                            gap = "Partial verified coverage."
+                            observed = f"Partial training completion evidenced ({total_completed}/{total_required} personnel qualified across {len(active_records)} roles)."
+                            gap = f"{total_required - total_completed} personnel pending qualification before independent access."
                             evidence_quality = "Partial"
                     else:
-                        status = "CONFLICT"
-                        gap = "Contradictory evidence: 0 required."
-                        evidence_quality = "Conflicting"
-                else:
-                    status = "NOT_EVIDENCED"
-                    observed = "Training evidence lacks structured numeric coverage."
-                    gap = "Insufficient evidence."
-                    evidence_quality = "Missing"
+                        status = "NOT_EVIDENCED"
+                        observed = "Training records do not define required operational roles."
+                        gap = "Undefined role requirements."
+                        evidence_quality = "Missing"
             
         else:
             if candidate_evidence:
@@ -705,100 +745,182 @@ class AuditEngine:
             
         return (status, evidence_quality, confidence, citations, observed, gap, severity, recommendation)
 
-    def cross_document_comparison(self, db: Session, system_id: str = "SYS-MES-001") -> CrossDocComparisonResponse:
+    def cross_document_comparison(self, db: Session, system_id: str = "SYS-MES-001", risk_threshold: Optional[int] = None) -> CrossDocComparisonResponse:
         """
         Compares primary MES PAS-X evidence directly against the high-level Master IT
-        System Lifecycle SOP (HACK-IT-SOP-001), citing both documents and flagging
-        POTENTIAL LIFECYCLE DEVIATION items.
+        System Lifecycle SOP (HACK-IT-SOP-001), citing both documents, maintaining
+        first-class generic provenance for both sides, and flagging POTENTIAL LIFECYCLE DEVIATION items.
         """
         comparison_items = []
         
+        # 1. Blocked Release Gates
         blocked_gates = db.query(ReleaseGate).filter(
             ReleaseGate.system_id == system_id,
             ReleaseGate.status.in_(["NOT MET", "BLOCKED"])
         ).all()
         for gate in blocked_gates:
-            mes_cites = []
-            if gate.evidence_doc:
-                mes_cites.append(f"[{gate.evidence_doc}]")
+            gate_cite = f"[{gate.id} | doc:{gate.evidence_doc or 'N/A'} | ev:{gate.evidence_id or 'N/A'} | sec:{gate.evidence_section or 'N/A'}]"
             item = CrossDocComparisonItem(
                 topic=gate.gate_name,
-                master_sop_section="HACK-IT-SOP-001",
-                sop_requirement=f"Gate {gate.gate_code} requirements must be fulfilled.",
-                mes_observed=gate.blocking_reason or f"Gate {gate.gate_code} is {gate.status}",
-                mes_citations=mes_cites,
-                sop_citations=["[HACK-IT-SOP-001]"],
                 alignment_status="POTENTIAL_LIFECYCLE_DEVIATION",
-                impact=f"Failure to meet {gate.gate_code} gate compromises release.",
-                recommended_action="Fulfill missing gate prerequisites."
+                deviation_type="UNMET_GATE",
+                source_entity_id=gate.id,
+                source_entity_type="RELEASE_GATE",
+                source_document_id=gate.evidence_doc,
+                source_evidence_id=gate.evidence_id,
+                source_locator=gate.evidence_section,
+                source_claim=f"Release Gate {gate.gate_code} ({gate.gate_name})",
+                target_entity_id="HACK-IT-SOP-001-GATES",
+                target_entity_type="SOP_REQUIREMENT",
+                target_document_id="HACK-IT-SOP-001",
+                target_evidence_id=None,
+                target_locator="Section 4 Phase Gate Governance",
+                target_observation=gate.blocking_reason or f"Gate {gate.gate_code} status is {gate.status}",
+                master_sop_section="HACK-IT-SOP-001",
+                sop_requirement=f"Gate {gate.gate_code} prerequisites must be fulfilled before stage transition.",
+                mes_observed=gate.blocking_reason or f"Gate {gate.gate_code} is {gate.status}",
+                mes_citations=[gate_cite],
+                sop_citations=["[HACK-IT-SOP-001 | Section 4]"],
+                impact=f"Failure to meet {gate.gate_code} gate compromises release readiness.",
+                recommended_action=f"Resolve blocking prerequisites for {gate.gate_code}: {gate.blocking_reason or 'Verify gate criteria'}."
             )
             comparison_items.append(item)
             
-        unmitigated_risks = db.query(Risk).filter(
-            Risk.system_id == system_id,
-            Risk.score >= 10
-        ).all()
-        if unmitigated_risks:
-            mes_cites = [f"[Risk ID: {r.id}]" for r in unmitigated_risks[:2]]
-            if unmitigated_risks[0].source_document_id:
-                mes_cites.append(f"[{unmitigated_risks[0].source_document_id}]")
+        # 2. Residual Risks Evaluation - strictly using configured threshold
+        effective_threshold = risk_threshold
+        if effective_threshold is None:
+            da03_spec = next((s for s in CORE_25_AUDIT_SPECS if s.get("q_id") == "DA-03-005"), None)
+            if da03_spec and "rule_parameters" in da03_spec and "risk_threshold" in da03_spec["rule_parameters"]:
+                effective_threshold = da03_spec["rule_parameters"]["risk_threshold"]
+        
+        if effective_threshold is not None:
+            unmitigated_risks = db.query(Risk).filter(
+                Risk.system_id == system_id,
+                Risk.score >= effective_threshold
+            ).all()
+            if unmitigated_risks:
+                sample_risk = unmitigated_risks[0]
+                risk_cites = [f"[{r.id} | score:{r.score} | doc:{r.source_document_id or 'N/A'} | ev:{r.evidence_id or 'N/A'}]" for r in unmitigated_risks[:2]]
+                item = CrossDocComparisonItem(
+                    topic="Residual Risk",
+                    alignment_status="POTENTIAL_LIFECYCLE_DEVIATION",
+                    deviation_type="UNMITIGATED_RISK",
+                    source_entity_id=sample_risk.id,
+                    source_entity_type="RISK",
+                    source_document_id=sample_risk.source_document_id,
+                    source_evidence_id=sample_risk.evidence_id,
+                    source_locator=sample_risk.control_mapping,
+                    source_claim=f"Identified {len(unmitigated_risks)} risks with score >= {effective_threshold}",
+                    target_entity_id="HACK-IT-SOP-001-RISK",
+                    target_entity_type="SOP_REQUIREMENT",
+                    target_document_id="HACK-IT-SOP-001",
+                    target_evidence_id=None,
+                    target_locator="Section 5 Risk Management",
+                    target_observation=f"Found {len(unmitigated_risks)} unmitigated high risks exceeding threshold {effective_threshold}.",
+                    master_sop_section="HACK-IT-SOP-001",
+                    sop_requirement=f"All risks with score >= {effective_threshold} require verified mitigations or explicit Quality Unit acceptance.",
+                    mes_observed=f"Found {len(unmitigated_risks)} unmitigated high risks (e.g. {sample_risk.id}: {sample_risk.rationale}).",
+                    mes_citations=risk_cites,
+                    sop_citations=["[HACK-IT-SOP-001 | Section 5]"],
+                    impact="Unrated residual risk creates unknown regulatory exposure under ICH Q9.",
+                    recommended_action="Conduct formal residual risk acceptance evaluation and map verification controls."
+                )
+                comparison_items.append(item)
+        else:
             item = CrossDocComparisonItem(
-                topic="Residual Risk",
+                topic="Residual Risk Configuration",
+                alignment_status="EVIDENCE_GAP",
+                deviation_type="UNCONFIGURED_THRESHOLD",
+                source_entity_id=None,
+                source_entity_type="RISK_CONFIG",
+                source_document_id=None,
+                source_evidence_id=None,
+                source_locator=None,
+                source_claim="No risk threshold configured in audit specifications",
+                target_entity_id="HACK-IT-SOP-001-RISK",
+                target_entity_type="SOP_REQUIREMENT",
+                target_document_id="HACK-IT-SOP-001",
+                target_evidence_id=None,
+                target_locator="Section 5 Risk Management",
+                target_observation="Missing explicit risk_threshold configuration",
                 master_sop_section="HACK-IT-SOP-001",
-                sop_requirement="All critical requirements must have verified mitigations.",
-                mes_observed=f"Found {len(unmitigated_risks)} unmitigated high risks.",
-                mes_citations=mes_cites,
-                sop_citations=["[HACK-IT-SOP-001]"],
-                alignment_status="POTENTIAL_LIFECYCLE_DEVIATION",
-                impact="Unrated residual risk creates unknown regulatory exposure.",
-                recommended_action="Conduct formal residual risk acceptance evaluation."
+                sop_requirement="Risk threshold must be defined before residual risk evaluation.",
+                mes_observed="Risk threshold not configured. Residual risk cannot be evaluated without explicit threshold.",
+                mes_citations=[],
+                sop_citations=["[HACK-IT-SOP-001 | Section 5]"],
+                impact="Cannot determine residual risk acceptability.",
+                recommended_action="Configure explicit risk_threshold parameter."
             )
             comparison_items.append(item)
 
+        # 3. Unverified Requirements
         from backend.app.models.entities import Requirement
         unverified_reqs = db.query(Requirement).filter(
             Requirement.system_id == system_id,
             Requirement.status != "VERIFIED"
         ).all()
         if unverified_reqs:
-            mes_cites = [f"[Req ID: {r.id}]" for r in unverified_reqs[:2]]
-            if unverified_reqs[0].source_document_id:
-                mes_cites.append(f"[{unverified_reqs[0].source_document_id}]")
+            sample_req = unverified_reqs[0]
+            req_cites = [f"[{r.requirement_id} | doc:{r.source_document_id or 'N/A'} | ev:{r.evidence_id or 'N/A'}]" for r in unverified_reqs[:2]]
             item = CrossDocComparisonItem(
                 topic="Requirement Verification",
-                master_sop_section="HACK-IT-SOP-001",
-                sop_requirement="All requirements must be verified.",
-                mes_observed=f"Found {len(unverified_reqs)} unverified requirements.",
-                mes_citations=mes_cites,
-                sop_citations=["[HACK-IT-SOP-001]"],
                 alignment_status="POTENTIAL_LIFECYCLE_DEVIATION",
-                impact="Unverified requirements compromise intended use.",
+                deviation_type="UNVERIFIED_REQ",
+                source_entity_id=sample_req.requirement_id,
+                source_entity_type="REQUIREMENT",
+                source_document_id=sample_req.source_document_id,
+                source_evidence_id=sample_req.evidence_id,
+                source_locator=f"p.{sample_req.source_page} {sample_req.source_section}" if sample_req.source_page else None,
+                source_claim=sample_req.text,
+                target_entity_id=sample_req.verification_reference or "VERIFICATION_NOT_EVIDENCED",
+                target_entity_type="VERIFICATION_TEST",
+                target_document_id="HACK-IT-SOP-001",
+                target_evidence_id=None,
+                target_locator="Section 6 Qualification & Verification",
+                target_observation=f"Requirement status is {sample_req.status} (verification execution records unevidenced)",
+                master_sop_section="HACK-IT-SOP-001",
+                sop_requirement="All requirements must have verified test execution records prior to operational release.",
+                mes_observed=f"Found {len(unverified_reqs)} unverified requirements (e.g. {sample_req.requirement_id} is '{sample_req.status}').",
+                mes_citations=req_cites,
+                sop_citations=["[HACK-IT-SOP-001 | Section 6]"],
+                impact="Unverified requirements compromise intended use confirmation.",
                 recommended_action="Complete intended-use qualification test scripts."
             )
             comparison_items.append(item)
             
         aligned_count = 0
-        deviations_count = len(comparison_items)
+        deviations_count = len([it for it in comparison_items if it.alignment_status != "ALIGNED"])
         
-        # Add some aligned items based on successful gates to make the numbers match if needed
+        # 4. Aligned Met Gates
         met_gates = db.query(ReleaseGate).filter(
             ReleaseGate.system_id == system_id,
             ReleaseGate.status == "MET"
         ).all()
         for gate in met_gates:
-            mes_cites = []
-            if gate.evidence_doc:
-                mes_cites.append(f"[{gate.evidence_doc}]")
+            gate_cite = f"[{gate.id} | doc:{gate.evidence_doc or 'N/A'} | ev:{gate.evidence_id or 'N/A'}]"
             item = CrossDocComparisonItem(
                 topic=gate.gate_name,
+                alignment_status="ALIGNED",
+                deviation_type=None,
+                source_entity_id=gate.id,
+                source_entity_type="RELEASE_GATE",
+                source_document_id=gate.evidence_doc,
+                source_evidence_id=gate.evidence_id,
+                source_locator=gate.evidence_section,
+                source_claim=f"Release Gate {gate.gate_code} ({gate.gate_name})",
+                target_entity_id="HACK-IT-SOP-001-GATES",
+                target_entity_type="SOP_REQUIREMENT",
+                target_document_id="HACK-IT-SOP-001",
+                target_evidence_id=None,
+                target_locator="Section 4 Phase Gate Governance",
+                target_observation=f"Gate {gate.gate_code} is MET with verified objective evidence.",
                 master_sop_section="HACK-IT-SOP-001",
                 sop_requirement=f"Gate {gate.gate_code} requirements must be fulfilled.",
-                mes_observed=f"Gate {gate.gate_code} is MET",
-                mes_citations=mes_cites,
-                sop_citations=["[HACK-IT-SOP-001]"],
-                alignment_status="ALIGNED",
+                mes_observed=f"Gate {gate.gate_code} is MET with evidence in {gate.evidence_doc or 'qualification package'}.",
+                mes_citations=[gate_cite],
+                sop_citations=["[HACK-IT-SOP-001 | Section 4]"],
                 impact="None",
-                recommended_action="None"
+                recommended_action="Maintain qualification baseline."
             )
             comparison_items.append(item)
             aligned_count += 1
@@ -810,9 +932,58 @@ class AuditEngine:
             items=comparison_items,
             total_compared=len(comparison_items),
             deviations_count=deviations_count,
-            gaps_count=deviations_count,
+            gaps_count=len([it for it in comparison_items if it.alignment_status == "EVIDENCE_GAP"]),
             aligned_count=aligned_count,
-            master_reference="HACK-IT-SOP-001 (Rev 4)"
         )
+
+    def get_latest_assessment(
+        self,
+        db: Session,
+        system_id: str = "SYS-MES-001",
+        checklist_id: Optional[str] = None
+    ) -> Optional[AuditAssessmentResponse]:
+        """
+        Retrieve the most recent stored audit assessment from the database.
+        Returns None if no assessments have been run yet.
+        """
+        query = db.query(AuditAssessment).filter(
+            AuditAssessment.system_id == system_id
+        )
+        if checklist_id:
+            query = query.filter(AuditAssessment.checklist_id == checklist_id)
+
+        assessment = query.order_by(AuditAssessment.assessed_at.desc()).first()
+        if not assessment:
+            return None
+
+        items = []
+        for item_data in (assessment.items_json or []):
+            try:
+                items.append(AuditAssessmentItem(**item_data))
+            except Exception:
+                pass
+
+        return AuditAssessmentResponse(
+            id=assessment.id,
+            system_id=assessment.system_id,
+            checklist_id=assessment.checklist_id,
+            assessed_at=assessment.assessed_at,
+            readiness_score=assessment.readiness_score,
+            total_questions=assessment.total_questions,
+            passed_count=assessment.passed_count,
+            partial_count=assessment.partial_count,
+            failed_count=assessment.failed_count,
+            not_evidenced_count=assessment.not_evidenced_count,
+            na_count=assessment.na_count,
+            critical_findings_count=assessment.critical_findings_count,
+            high_findings_count=assessment.high_findings_count,
+            medium_findings_count=assessment.medium_findings_count,
+            low_findings_count=assessment.low_findings_count,
+            items=items,
+            findings=assessment.findings_json or [],
+            lifecycle_gaps=assessment.lifecycle_gaps_json or [],
+            status=assessment.status
+        )
+
 
 audit_engine = AuditEngine()

@@ -178,6 +178,12 @@ export interface DashboardOverview {
   findings_by_severity: Record<string, number>;
   systems_summary: Array<Record<string, any>>;
   agent_health: Record<string, string>;
+  requirements_count?: number;
+  verified_requirements_count?: number;
+  unverified_requirements_count?: number;
+  risks_count?: number;
+  blocked_gates_count?: number;
+  blocked_gates_summary?: string[];
 }
 
 export interface ReleaseGate {
@@ -311,13 +317,31 @@ export interface AuditAssessment {
 
 export interface CrossDocComparisonItem {
   topic: string;
+  alignment_status: 'ALIGNED' | 'POTENTIAL_LIFECYCLE_DEVIATION' | 'EVIDENCE_GAP';
+  deviation_type?: string;
+
+  // Side A (Source Entity)
+  source_entity_id?: string;
+  source_entity_type?: string;
+  source_document_id?: string;
+  source_evidence_id?: string;
+  source_locator?: string;
+  source_claim?: string;
+
+  // Side B (Target Entity)
+  target_entity_id?: string;
+  target_entity_type?: string;
+  target_document_id?: string;
+  target_evidence_id?: string;
+  target_locator?: string;
+  target_observation?: string;
+
   master_sop_section: string;
   sop_requirement: string;
   mes_observed: string;
   mes_citations: string[];
   sop_citations: string[];
-
-  alignment_status: 'ALIGNED' | 'POTENTIAL_LIFECYCLE_DEVIATION' | 'EVIDENCE_GAP';
+  benchmark_ref?: string;
   impact: string;
   recommended_action: string;
 }

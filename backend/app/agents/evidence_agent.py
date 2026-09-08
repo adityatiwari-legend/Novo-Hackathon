@@ -303,8 +303,19 @@ class AuditEvidenceAgent:
 
     def execute(self, db: Session, system_id: str = "SYS-MES-001", actor_id: str = "audit_evidence_agent") -> AgentResult:
         system = db.query(System).filter(System.id == system_id).first()
-        sys_name = system.name if system else "Novo Life MES PAS-X"
-        readiness = system.readiness_score if system else 48
+        if not system:
+            return AgentResult(
+                agent=self.name,
+                status="ERROR",
+                confidence=0.0,
+                findings=[],
+                citations=[],
+                recommendations=[],
+                warnings=[f"System '{system_id}' not found in database. Cannot generate evidence pack without valid system state."],
+                metadata={"error": "SYSTEM_NOT_FOUND", "system_id": system_id}
+            )
+        sys_name = system.name
+        readiness = system.readiness_score
         
         from backend.app.services.compliance_engine import compliance_engine
         from backend.app.services.release_gate_engine import release_gate_engine

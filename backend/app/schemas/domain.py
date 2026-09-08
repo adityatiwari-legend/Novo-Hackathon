@@ -251,6 +251,12 @@ class DashboardOverview(BaseModel):
     findings_by_severity: Dict[str, int]
     systems_summary: List[Dict[str, Any]]
     agent_health: Dict[str, str]
+    requirements_count: Optional[int] = 0
+    verified_requirements_count: Optional[int] = 0
+    unverified_requirements_count: Optional[int] = 0
+    risks_count: Optional[int] = 0
+    blocked_gates_count: Optional[int] = 0
+    blocked_gates_summary: Optional[List[str]] = []
 
 # ----------------- Audit Checklist & Assessment -----------------
 class AuditQuestionResponse(BaseModel):
@@ -336,13 +342,32 @@ class AuditExecuteRequest(BaseModel):
 
 class CrossDocComparisonItem(BaseModel):
     topic: str
+    alignment_status: str  # ALIGNED, POTENTIAL_LIFECYCLE_DEVIATION, EVIDENCE_GAP
+    deviation_type: Optional[str] = None  # UNMET_GATE, UNMITIGATED_RISK, UNVERIFIED_REQ
+    
+    # Side A (Source Entity, e.g. Requirement, Release Gate, SOP Clause)
+    source_entity_id: Optional[str] = None
+    source_entity_type: Optional[str] = None
+    source_document_id: Optional[str] = None
+    source_evidence_id: Optional[str] = None
+    source_locator: Optional[str] = None
+    source_claim: Optional[str] = None
+    
+    # Side B (Target Entity, e.g. Test Case, Risk Mitigation, Execution)
+    target_entity_id: Optional[str] = None
+    target_entity_type: Optional[str] = None
+    target_document_id: Optional[str] = None
+    target_evidence_id: Optional[str] = None
+    target_locator: Optional[str] = None
+    target_observation: Optional[str] = None
+
+    # Summary & Presentation fields
     master_sop_section: str
     sop_requirement: str
     mes_observed: str
-    mes_citations: List[str]
-    sop_citations: List[str]
+    mes_citations: List[str] = []
+    sop_citations: List[str] = []
     benchmark_ref: Optional[str] = None
-    alignment_status: str  # ALIGNED, POTENTIAL_LIFECYCLE_DEVIATION, EVIDENCE_GAP
     impact: str
     recommended_action: str
 
